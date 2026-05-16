@@ -6,7 +6,7 @@
 package model
 
 import (
-	"gotribe/internal/core/util"
+	utils "gotribe/internal/core/util"
 
 	"gorm.io/gorm"
 )
