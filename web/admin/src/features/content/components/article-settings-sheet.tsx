@@ -43,10 +43,20 @@ import {
 } from '@/components/ui/popover'
 import { Badge } from '@/components/ui/badge'
 import { DatePicker } from '@/components/date-picker'
-import { Settings, X, ChevronsUpDown, Plus, Check, Trash2 } from 'lucide-react'
+import {
+  Settings,
+  X,
+  ChevronsUpDown,
+  Plus,
+  Check,
+  Trash2,
+  Sparkles,
+  Loader2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { createTag } from '../service/tag'
+import { createTag, getTagList } from '../service/tag'
+import { generateAI } from '@/features/ai/service'
 import { useI18n } from '@/context/i18n-provider'
 import type { ArticleFormValues } from '../article-form-page'
 import type { User, Project } from '@/shared/types'
@@ -90,6 +100,13 @@ const buildInlineTagSlug = (title: string) => {
   return `tag-${Date.now().toString().slice(-8)}`
 }
 
+type SuggestedTag = {
+  title: string
+  color?: string
+}
+
+const normalizeTagTitle = (title: string) => title.trim().toLowerCase()
+
 interface ArticleSettingsSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -117,6 +134,14 @@ export function ArticleSettingsSheet({
   const queryClient = useQueryClient()
   const [searchTagValue, setSearchTagValue] = useState('')
   const pendingCreateTitleRef = useRef<string | null>(null)
+
+  const applyTagIDs = (tagIDs: string[]) => {
+    const uniqueIDs = Array.from(new Set(tagIDs.filter(Boolean)))
+    form.setValue('tag', uniqueIDs.join(','), {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }
 
   // 监听 tagList 变化，如果有待创建的标签且在列表中找到了，则自动选中
   useEffect(() => {
@@ -147,6 +172,90 @@ export function ArticleSettingsSheet({
       toast.error(t('features.content.tag.createError'))
       pendingCreateTitleRef.current = null
     }
+  })
+
+  const generateTagMutation = useMutation({
+    mutationFn: async () => {
+      const values = form.getValues()
+      const title = (values.title ?? '').trim()
+      const description = (values.description ?? '').trim()
+      const content = (values.content ?? '').trim()
+      if (!title && !description && !content) {
+        throw new Error('请先填写标题、简介或正文')
+      }
+
+      const aiResult = await generateAI({
+        task: 'post_tags',
+        language: 'zh-CN',
+        input: { title, description, content },
+      })
+      const suggestions = Array.isArray(aiResult.result.tags)
+        ? (aiResult.result.tags as SuggestedTag[])
+        : []
+      const normalizedSuggestions = suggestions
+        .map((item) => ({
+          title: String(item.title ?? '').trim(),
+          color: String(item.color ?? '').trim() || getRandomColor(),
+        }))
+        .filter((item) => item.title.length > 0)
+        .slice(0, 3)
+
+      if (normalizedSuggestions.length === 0) {
+        throw new Error('AI 没有生成可用标签')
+      }
+
+      const currentTagIds = (form.getValues('tag') ?? '')
+        .split(',')
+        .filter(Boolean)
+      const nextTagIds = [...currentTagIds]
+      const existingTags = new Map(
+        tagList.map((tag) => [normalizeTagTitle(tag.title), tag])
+      )
+
+      for (const suggestion of normalizedSuggestions) {
+        const existingTag = existingTags.get(normalizeTagTitle(suggestion.title))
+        if (existingTag) {
+          nextTagIds.push(String(existingTag.id))
+          continue
+        }
+
+        const matched = await getTagList({
+          title: suggestion.title,
+          page: 1,
+          per_page: 10,
+        })
+        const matchedTag = (matched.tags ?? []).find(
+          (tag) => normalizeTagTitle(tag.title) === normalizeTagTitle(suggestion.title)
+        )
+        if (matchedTag) {
+          nextTagIds.push(String(matchedTag.id))
+          existingTags.set(normalizeTagTitle(matchedTag.title), matchedTag)
+          continue
+        }
+
+        const created = await createTag({
+          title: suggestion.title,
+          slug: buildInlineTagSlug(suggestion.title),
+          description: suggestion.title,
+          color: suggestion.color,
+          status: 1,
+        })
+        if (created.tag?.id) {
+          nextTagIds.push(String(created.tag.id))
+          existingTags.set(normalizeTagTitle(created.tag.title), created.tag)
+        }
+      }
+
+      applyTagIDs(nextTagIds)
+      await queryClient.invalidateQueries({ queryKey: ['tagList'] })
+      return normalizedSuggestions.length
+    },
+    onSuccess: (count) => {
+      toast.success(`已生成并选中 ${count} 个标签`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'AI 标签生成失败')
+    },
   })
 
   const isPasswd = useWatch({
@@ -399,7 +508,24 @@ export function ArticleSettingsSheet({
 
                 return (
                   <FormItem>
-                    <FormLabel>{t('features.content.article.form.tag')}</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>{t('features.content.article.form.tag')}</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shrink-0"
+                        disabled={generateTagMutation.isPending}
+                        onClick={() => generateTagMutation.mutate()}
+                      >
+                        {generateTagMutation.isPending ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-1 h-3.5 w-3.5" />
+                        )}
+                        AI
+                      </Button>
+                    </div>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>

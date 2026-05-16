@@ -22,6 +22,7 @@ type PostResponse struct {
 	Title        string        `json:"title"`
 	Content      string        `json:"content"`
 	HTMLContent  string        `json:"html_content"`
+	WordCount    int           `json:"word_count"`
 	Description  string        `json:"description"`
 	Icon         string        `json:"icon"`
 	View         int64         `json:"view"`

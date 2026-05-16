@@ -51,6 +51,8 @@ func (s *service) Generate(ctx context.Context, req *dto.GenerateRequest) (*dto.
 		return s.generatePostSlug(ctx, req)
 	case "post_description":
 		return s.generatePostDescription(ctx, req)
+	case "post_tags":
+		return s.generatePostTags(ctx, req)
 	default:
 		return nil, errs.BadRequest("不支持的 AI 任务", nil)
 	}
@@ -188,6 +190,81 @@ func (s *service) generatePostMetadata(ctx context.Context, req *dto.GenerateReq
 	return &dto.GenerateResponse{Result: result}, nil
 }
 
+func (s *service) generatePostTags(ctx context.Context, req *dto.GenerateRequest) (*dto.GenerateResponse, error) {
+	title := stringInput(req.Input, "title")
+	description := stringInput(req.Input, "description")
+	content := stringInput(req.Input, "content")
+	if strings.TrimSpace(title) == "" && strings.TrimSpace(description) == "" && strings.TrimSpace(content) == "" {
+		return nil, errs.BadRequest("标题、简介或正文不能为空", nil)
+	}
+	if len(content) > 6000 {
+		content = content[:6000]
+	}
+
+	language := strings.TrimSpace(req.Language)
+	if language == "" {
+		language = "zh-CN"
+	}
+
+	raw, err := s.chat(
+		ctx,
+		"你是 CMS 的内容分类编辑助手。只输出 JSON，不要输出 Markdown。",
+		fmt.Sprintf(`请根据文章内容生成 1-3 个标签。
+
+要求：
+1. 标签使用 %s，短而具体，每个 2-10 个字符或等量长度。
+2. 不要超过 3 个标签，不要输出重复标签。
+3. color 必须是适合标签展示的十六进制颜色，格式为 #RRGGBB。
+4. 不要编造正文没有的信息。
+
+标题：%s
+
+简介：
+%s
+
+正文：
+%s
+
+请严格返回 JSON：
+{"tags":[{"title":"...","color":"#3366CC"}]}`, language, title, description, content),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var parsed struct {
+		Tags []struct {
+			Title string `json:"title"`
+			Color string `json:"color"`
+		} `json:"tags"`
+	}
+	if err := json.Unmarshal([]byte(extractJSONObject(raw)), &parsed); err != nil {
+		return nil, errs.Internal("AI 返回解析失败", err)
+	}
+
+	tags := make([]map[string]string, 0, 3)
+	seen := map[string]struct{}{}
+	for _, item := range parsed.Tags {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		key := strings.ToLower(title)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		tags = append(tags, map[string]string{
+			"title": title,
+			"color": normalizeHexColor(item.Color),
+		})
+		if len(tags) == 3 {
+			break
+		}
+	}
+	return &dto.GenerateResponse{Result: map[string]any{"tags": tags}}, nil
+}
+
 func (s *service) chat(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	baseURL := strings.TrimRight(s.cfg.BaseURL, "/")
 	if baseURL == "" {
@@ -287,4 +364,20 @@ func normalizeSlug(raw string) string {
 		}
 	}
 	return strings.Trim(b.String(), "-")
+}
+
+func normalizeHexColor(raw string) string {
+	color := strings.ToUpper(strings.TrimSpace(raw))
+	if len(color) == 6 {
+		color = "#" + color
+	}
+	if len(color) != 7 || color[0] != '#' {
+		return "#64748B"
+	}
+	for _, r := range color[1:] {
+		if !((r >= '0' && r <= '9') || (r >= 'A' && r <= 'F')) {
+			return "#64748B"
+		}
+	}
+	return color
 }

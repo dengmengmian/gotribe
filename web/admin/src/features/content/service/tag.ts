@@ -26,8 +26,8 @@ export const getTagList = async (params?: {
 // 创建标签
 export async function createTag(
   params: Partial<Tag>,
-): Promise<{ success: boolean }> {
-  return request.post<{ success: boolean }>('/api/tag', params)
+): Promise<{ tag?: Tag }> {
+  return request.post<{ tag?: Tag }>('/api/tag', params)
 }
 
 // 更新标签

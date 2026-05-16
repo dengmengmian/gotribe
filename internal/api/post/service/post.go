@@ -7,8 +7,11 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	"html"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	postdto "gotribe/internal/api/post/dto"
 	postrepo "gotribe/internal/api/post/repository"
@@ -19,6 +22,8 @@ import (
 	"gotribe/internal/core/errs"
 	"gotribe/internal/model"
 )
+
+var htmlTagPattern = regexp.MustCompile(`<[^>]+>`)
 
 // Service 负责封装文章相关的业务逻辑。
 type Service struct {
@@ -167,6 +172,7 @@ func toPostResponse(post model.Post, tagModels []model.Tag, includeBody bool) po
 		Title:        post.Title,
 		Content:      content,
 		HTMLContent:  htmlContent,
+		WordCount:    countHTMLWords(post.HtmlContent),
 		Description:  post.Description,
 		Icon:         post.Icon,
 		View:         int64(post.View),
@@ -194,4 +200,31 @@ func toTimeString(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+// countHTMLWords 基于完整 HTML 正文估算可阅读文本字数。
+func countHTMLWords(value string) int {
+	text := html.UnescapeString(htmlTagPattern.ReplaceAllString(value, " "))
+	count := 0
+	inLatinWord := false
+	for _, r := range text {
+		if unicode.IsSpace(r) {
+			inLatinWord = false
+			continue
+		}
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			if r <= unicode.MaxASCII {
+				if !inLatinWord {
+					count++
+					inLatinWord = true
+				}
+				continue
+			}
+			count++
+			inLatinWord = false
+			continue
+		}
+		inLatinWord = false
+	}
+	return count
 }

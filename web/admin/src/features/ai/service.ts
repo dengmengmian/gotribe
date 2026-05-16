@@ -1,6 +1,10 @@
 import { request } from '@/service'
 
-export type AIGenerateTask = 'post_metadata' | 'post_slug' | 'post_description'
+export type AIGenerateTask =
+  | 'post_metadata'
+  | 'post_slug'
+  | 'post_description'
+  | 'post_tags'
 
 export interface AIGenerateResponse {
   result: Record<string, unknown>

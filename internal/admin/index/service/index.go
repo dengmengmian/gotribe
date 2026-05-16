@@ -37,6 +37,7 @@ func NewService(tx *database.TransactionManager, redis redis.UniversalClient) Se
 
 // Dashboard 并发聚合仪表盘全量数据。
 func (s *service) Dashboard(ctx context.Context, projectID string) (*dto.IndexResponse, error) {
+	requestCtx := ctx
 	var (
 		stats          dto.Stats
 		visitTrend     []dto.VisitPoint
@@ -51,8 +52,16 @@ func (s *service) Dashboard(ctx context.Context, projectID string) (*dto.IndexRe
 	g.Go(func() error { var err error; stats, err = s.indexRepo.Stats(ctx, projectID); return err })
 	g.Go(func() error { var err error; visitTrend, err = s.indexRepo.VisitTrend(ctx, projectID); return err })
 	g.Go(func() error { var err error; recentPosts, err = s.indexRepo.RecentPosts(ctx, projectID, 5); return err })
-	g.Go(func() error { var err error; recentComments, err = s.indexRepo.RecentComments(ctx, projectID, 5); return err })
-	g.Go(func() error { var err error; popularPosts, err = s.indexRepo.PopularPosts(ctx, projectID, 5); return err })
+	g.Go(func() error {
+		var err error
+		recentComments, err = s.indexRepo.RecentComments(ctx, projectID, 5)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		popularPosts, err = s.indexRepo.PopularPosts(ctx, projectID, 5)
+		return err
+	})
 	g.Go(func() error { var err error; pending, err = s.indexRepo.PendingCounts(ctx, projectID); return err })
 
 	if err := g.Wait(); err != nil {
@@ -61,15 +70,15 @@ func (s *service) Dashboard(ctx context.Context, projectID string) (*dto.IndexRe
 
 	sysStatus := dto.SystemStatus{DBStatus: "ok", RedisStatus: "ok"}
 	if s.redis != nil {
-		if _, err := s.redis.Ping(ctx).Result(); err != nil {
+		if _, err := s.redis.Ping(requestCtx).Result(); err != nil {
 			sysStatus.RedisStatus = "error"
 		}
 	} else {
 		sysStatus.RedisStatus = "未连接"
 	}
 
-	cacheStatus := s.cacheInfo(ctx)
-	seoAlerts := s.indexRepo.SeoAlerts(ctx, projectID)
+	cacheStatus := s.cacheInfo(requestCtx)
+	seoAlerts := s.indexRepo.SeoAlerts(requestCtx, projectID)
 
 	return &dto.IndexResponse{
 		Stats:          stats,
