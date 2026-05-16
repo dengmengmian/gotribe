@@ -1,0 +1,99 @@
+# 本文件定义仓库中不需要提交的本地产物与环境文件。
+
+# === Go 构建输出 ===
+# 本地构建输出目录。
+bin/
+# 可执行文件（Windows）。
+*.exe
+*.exe~
+# 动态链接库。
+*.dll
+*.so
+*.dylib
+# Go 测试二进制文件。
+*.test
+
+# === Go 依赖 ===
+# vendor 目录（如果使用 vendoring）。
+vendor/
+
+# === IDE / 编辑器 ===
+# JetBrains IDE。
+.idea/
+# VS Code。
+.vscode/
+# Vim 交换文件。
+*.swp
+*.swo
+*~
+
+# === 本地环境配置 ===
+# 本地环境变量文件。
+.env
+.env.local
+.env.*.local
+# direnv 配置。
+.envrc
+
+# === 应用配置 ===
+# 本地私有配置文件（保留 example 文件）。
+configs/config.yaml
+# 开发环境真实配置目录。
+.configs/
+
+# === K8s 密钥 ===
+# 包含真实数据库密码和 JWT 密钥的 Secret 文件（由 secret.example.yaml 生成）。
+deployments/k8s/secret.yaml
+
+# === 日志 ===
+*.log
+
+# === 测试产物 ===
+# 覆盖率报告。
+coverage.out
+coverage.html
+tests/coverage/
+# pprof profile 文件。
+*.prof
+
+# === 性能测试产物 ===
+# 自动生成的性能测试报告。
+tests/perf_report.md
+# benchmark CPU / 内存 profile 输出目录。
+tests/bench/profiles/
+
+# === 系统文件 ===
+# macOS 生成的系统文件。
+.DS_Store
+# Windows 缩略图缓存。
+Thumbs.db
+
+# === 临时文件 ===
+tmp/
+temp/
+*.tmp
+
+# === 前端构建产物 ===
+# admin 前端 node_modules 和构建输出（pnpm 管理，不提交）。
+web/admin/node_modules/
+web/admin/dist/
+web/admin/.vite/
+web/admin/.cache/
+.pnpm-store/
+
+# === 运行时生成产物 ===
+# admin sitemap 定时任务生成的 XML 文件。
+public/admin/*.xml
+
+# === AI 工具文件 ===
+# 以下目录由 AI 助手自动生成，不纳入版本控制。
+.omc/
+.claude/
+.otaro/
+.playwright-mcp/
+
+# Go/tool cache accidentally copied with admin web
+web/admin/pkg/
+/admin
+.gocache/
+CLAUDE.md

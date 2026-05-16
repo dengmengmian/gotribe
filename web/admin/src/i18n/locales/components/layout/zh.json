@@ -1,0 +1,48 @@
+{
+  "menu": {
+    "dashboard": "控制台",
+    "content": "内容管理",
+    "article": "文章",
+    "category": "分类",
+    "tag": "标签",
+    "column": "专栏",
+    "config": "数据源",
+    "resource": "资源库",
+    "system": "系统管理",
+    "system_config": "系统配置",
+    "admin": "管理员",
+    "role": "角色权限",
+    "menu": "菜单",
+    "api": "接口权限",
+    "config_system": "系统配置",
+    "business": "用户与项目",
+    "project": "项目",
+    "user": "用户",
+    "order": "订单",
+    "promotion": "运营管理",
+    "scene": "场景",
+    "advertising": "广告"
+  },
+  "navUser": {
+    "upgradeToPro": "升级到专业版",
+    "personalCenter": "个人中心",
+    "changeAvatar": "更换头像",
+    "changeAvatarDesc": "从资源管理中选择或上传头像图片",
+    "avatarUpdateSuccess": "头像已更新",
+    "english": "English",
+    "chinese": "中文",
+    "signOut": "退出登录",
+    "theme": "主题",
+    "config": "配置"
+  },
+  "appTitle": {
+    "title": "Shadcn-Admin",
+    "subtitle": "Vite + ShadcnUI",
+    "toggleSidebar": "切换侧边栏"
+  },
+  "signOutDialog": {
+    "title": "退出登录",
+    "description": "确定要退出登录吗？您需要重新登录才能访问您的账户。",
+    "confirmText": "退出登录"
+  }
+}

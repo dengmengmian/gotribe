@@ -1,0 +1,12 @@
+# 本文件定义应用在 Kubernetes 集群内暴露的 Service。
+apiVersion: v1
+kind: Service
+metadata:
+  name: gotribe-api
+spec:
+  selector:
+    app: gotribe-api
+  ports:
+    # 集群内访问使用 80 端口，转发到容器内 8080。
+    - port: 80
+      targetPort: 8080

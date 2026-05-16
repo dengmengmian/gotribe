@@ -1,0 +1,18 @@
+# 本文件定义应用在 Kubernetes 中的基础网络策略。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gotribe-api
+spec:
+  podSelector:
+    matchLabels:
+      app: gotribe-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - {}

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS public.example_post CASCADE;
+DROP TABLE IF EXISTS public.example CASCADE;

@@ -1,0 +1,17 @@
+// Copyright 2023 Innkeeper gotribe <info@gotribe.cn>. All rights reserved.
+// Use of this source code is governed by a Apache style
+// license that can be found in the LICENSE file. The original repo for
+// this file is https://www.gotribe.cn
+
+package model
+
+type Feedback struct {
+	Model
+	Title     string   `gorm:"type:varchar(255);uniqueIndex;not null;comment:标题" json:"title"`
+	Content   string   `gorm:"type:text;comment:内容" json:"content"`
+	Phone     string   `gorm:"type:varchar(20);comment:电话" json:"phone"`
+	UserID int64     `gorm:"index;comment:用户ID" json:"user_id"`
+	ProjectID int64     `gorm:"index;comment:项目 ID" json:"project_id"`
+	User      *User    `gorm:"-" json:"user"`
+	Project   *Project `gorm:"-" json:"project"`
+}

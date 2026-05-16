@@ -1,0 +1,252 @@
+# =========================================================================
+# GoTribe 配置示例
+# -------------------------------------------------------------------------
+# 复制为 configs/config.yaml 后使用。
+# 配置分区约定：
+# - 公用配置：app / database / redis / observability
+# - ToC API 专属：server / auth / rate_limit
+# - Admin 专属：admin
+# 环境变量可覆盖同名配置，例如 database.host 可用
+# GOTRIBE_DATABASE_HOST 覆盖。
+# =========================================================================
+
+# =========================================================================
+# 公用配置：ToC API 和 Admin 都会使用
+# =========================================================================
+app:
+  # 应用名称，用于日志、监控和部分缓存 key 前缀。
+  name: gotribe-api
+  # 运行环境，可选 development / production。
+  env: development
+  # ToC API 默认项目 ID。请求未传 X-Project-ID 时使用。
+  default_project_id: "replace-with-project-id"
+
+database:
+  # 数据库类型。当前项目主线使用 postgres。
+  type: postgres
+  # 数据库账号。
+  username: replace-me
+  # 数据库密码。
+  password: replace-me
+  # 数据库名。
+  database: replace-me
+  # 数据库主机。
+  host: localhost
+  # 数据库端口。
+  port: 5432
+  # PostgreSQL DSN 附加参数。
+  query: connect_timeout=10 TimeZone=Asia/Shanghai
+  # 是否打印 SQL 日志。开发环境建议开启，生产环境建议关闭。
+  log_mode: true
+  # PostgreSQL SSL 模式，本地一般为 disable。
+  sslmode: disable
+  # MySQL 兼容字段。当前 postgres 不使用，保留是为了配置结构兼容。
+  charset: utf8mb4
+  # MySQL 兼容字段。当前 postgres 不使用，保留是为了配置结构兼容。
+  collation: utf8mb4_general_ci
+  # 最大空闲连接数。
+  max_idle_conns: 10
+  # 最大打开连接数。
+  max_open_conns: 30
+  # 空闲连接最大保留时间，单位分钟。
+  conn_max_idle_time_mins: 10
+  # 连接最大复用时间，单位分钟。
+  conn_max_lifetime_mins: 30
+
+redis:
+  # Redis 地址，格式 host:port。
+  addr: 127.0.0.1:6379
+  # Redis 密码，无密码留空。
+  password: ""
+  # Redis DB 编号。
+  db: 0
+  # Redis 连接池大小。
+  pool_size: 10
+  # 默认缓存 TTL，单位分钟。
+  default_cache_ttl_mins: 5
+
+upload:
+  # 公用上传供应商，ToC API 和 Admin 都复用这一套资源存储配置。
+  # 可选 qiniu / oss / local 等，取决于后端实现。
+  provider: qiniu
+  # 上传供应商 Access Key。
+  access_key: replace-me
+  # 上传供应商 Secret Key。
+  secret_key: replace-me
+  # 上传供应商 endpoint。
+  endpoint: replace-me
+  # 上传 bucket。
+  bucket: replace-me
+  # 上传区域，供应商需要时填写。
+  region: ""
+  # 上传资源访问域名，Admin 资源管理和未来 ToC API 上传都会使用。
+  cdn_domain: https://cdn.example.com/
+
+observability:
+  # 是否启用 /metrics 指标。
+  metrics_enabled: true
+  # 是否生成并透传 trace 信息。
+  tracing_enabled: true
+
+# =========================================================================
+# AI 生成配置：Admin 后台通用 AI 能力
+# =========================================================================
+ai:
+  # 当前使用 DeepSeek OpenAI-compatible API。
+  provider: deepseek
+  # DeepSeek API 地址。环境变量：GOTRIBE_AI_BASE_URL。
+  base_url: https://api.deepseek.com
+  # API Key。生产/本地建议用环境变量 GOTRIBE_AI_API_KEY 注入，不要提交真实 key。
+  api_key: ""
+  # 默认模型。环境变量：GOTRIBE_AI_MODEL。
+  model: deepseek-v4-flash
+  # 请求超时秒数。
+  timeout_seconds: 30
+
+# =========================================================================
+# ToC API 专属配置：cmd/api 使用
+# =========================================================================
+server:
+  # ToC API HTTP 监听端口。
+  port: 8080
+  # 读取请求超时时间，单位秒。
+  read_timeout_seconds: 10
+  # 写响应超时时间，单位秒。
+  write_timeout_seconds: 15
+  # 空闲连接超时时间，单位秒。
+  idle_timeout_seconds: 60
+  # 优雅退出超时时间，单位秒。
+  shutdown_timeout_seconds: 10
+  # 请求头最大字节数，当前为 1 MB。
+  max_header_bytes: 1048576
+  # 请求体最大字节数，当前为 10 MB。
+  max_request_body_bytes: 10485760
+  # ToC API 跨域配置。
+  cors:
+    # 开发环境允许所有来源；生产环境应改成具体域名。
+    allowed_origins:
+      - "*"
+    allowed_headers:
+      - "Authorization"
+      - "Content-Type"
+      - "X-Project-ID"
+      - "X-Request-ID"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PATCH"
+      - "OPTIONS"
+
+auth:
+  # 共享 issuer，写入 JWT `iss` claim。
+  issuer: gotribe
+  # 共享 secret，签名密钥；至少 32 位，不能使用占位值。
+  secret: replace-with-your-own-long-random-secret-min-32-chars
+  # ToC API 终端用户 audience。
+  user:
+    # 写入 JWT `aud` claim 的字符串，与 Admin 互不通用。
+    audience: gotribe.user
+    # Access Token 有效期，单位分钟。
+    access_token_ttl_minutes: 120
+    # Refresh Token 有效期，单位小时。
+    refresh_token_ttl_hours: 168
+  # Admin 后台 audience。当前阶段仅 ToC API 使用 core，Admin 仍走 admin.jwt（待 proposal 0001 Phase D 接入）。
+  admin:
+    audience: gotribe.admin
+    access_token_ttl_minutes: 60
+    refresh_token_ttl_hours: 24
+
+rate_limit:
+  # 是否开启 ToC API 限流。
+  enabled: true
+  # 登录/刷新类接口每分钟限制。
+  auth_per_minute: 10
+  # 普通 API 每分钟限制。
+  api_per_minute: 120
+  # 用户事件上报类接口每分钟限制。
+  event_per_minute: 60
+
+# =========================================================================
+# Admin 专属配置：cmd/admin 使用
+# =========================================================================
+admin:
+  # Admin 运行模式，debug / release。
+  mode: debug
+  # Admin 监听地址。
+  host: 0.0.0.0
+  # Admin 后端端口。
+  port: 8089
+  # Admin API URL 前缀。实际接口形如 /api/admin/info。
+  url_path_prefix: api
+
+  # 是否执行初始化数据 seed。
+  # true 表示启动时补齐缺失的内置角色、管理员、菜单、API、基础内容等。
+  init_data: true
+  # 是否同步更新已存在的内置 seed 数据。
+  # 只建议第一次熟悉系统、或明确要同步内置菜单/API/角色定义时临时打开。
+  # 日常保持 false，避免重启后覆盖后台手工调整过的菜单名、排序或权限描述。
+  sync_seed_data: false
+
+  # 是否启用 SQL migration。debug 环境会自动跑 migrations/，release 环境只检查状态。
+  enable_migrate: true
+  # 是否启用旧 OSS 开关。upload.provider 为空时会作为兼容兜底。
+  enable_oss: false
+
+  logs:
+    # zap 日志级别，-1=debug，0=info，1=warn，2=error。
+    level: -1
+    # 日志目录。
+    path: logs
+    # 单个日志文件最大 MB。
+    max_size: 50
+    # 最多保留日志文件数量。
+    max_backups: 100
+    # 日志最大保留天数。
+    max_age: 30
+    # 是否压缩历史日志。
+    compress: false
+
+  casbin:
+    # Admin RBAC 模型文件路径。
+    model_path: configs/rbac_model.conf
+
+  jwt:
+    # Admin JWT realm。
+    realm: gotribe-admin
+    # Admin JWT 密钥，至少 32 位，生产环境必须替换。
+    key: replace-with-your-own-admin-jwt-secret-min-32-chars
+    # Admin access token 有效期，单位小时。
+    timeout: 12
+    # Admin token 最大刷新窗口，单位小时。
+    max_refresh: 12
+    # Admin token 读取位置。
+    token_lookup: "header: Authorization, query: token"
+
+  rate_limit:
+    # Admin 令牌桶填充间隔，单位毫秒。
+    fill_interval: 50
+    # Admin 令牌桶容量。
+    capacity: 200
+
+  baidu_push:
+    # 百度搜索资源平台推送 token。
+    token: replace-me
+
+  jobs:
+    # 是否启用 Admin 定时任务调度器。
+    enabled: false
+    list:
+      sitemap:
+        name: sitemap
+        description: "生成站点地图"
+        schedule: "@every 1h"
+        enabled: true
+        timeout: 300s
+        retry_count: 3
+      example:
+        name: example
+        description: "示例任务"
+        schedule: "@every 30s"
+        enabled: false
+        timeout: 60s
+        retry_count: 1

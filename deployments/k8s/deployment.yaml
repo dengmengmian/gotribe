@@ -1,0 +1,79 @@
+# 本文件定义应用在 Kubernetes 中的 Deployment 资源。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gotribe-api
+spec:
+  # 默认启动两个副本，便于基本可用性验证。
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: gotribe-api
+  template:
+    metadata:
+      labels:
+        app: gotribe-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: gotribe-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gotribe-api
+          image: gotribe-api:latest
+          ports:
+            - containerPort: 8080
+          # 配置和敏感信息分别来自 ConfigMap 与 Secret。
+          envFrom:
+            - configMapRef:
+                name: gotribe-api-config
+            - secretRef:
+                name: gotribe-api-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          # 存活探针用于检查进程是否仍然活着。
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # 就绪探针用于检查依赖是否已准备完成。
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12

@@ -1,0 +1,34 @@
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+WORKDIR /app
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+    -ldflags="-s -w -X 'gotribe/internal/buildinfo.Version=${VERSION}' -X 'gotribe/internal/buildinfo.Commit=${COMMIT}' -X 'gotribe/internal/buildinfo.BuildTime=${BUILD_TIME}'" \
+    -o /out/gotribe-admin ./cmd/admin
+
+FROM alpine:3.22
+
+WORKDIR /app
+RUN apk add --no-cache tzdata
+RUN adduser -D -g '' appuser
+RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
+
+COPY --from=builder /out/gotribe-admin /app/gotribe-admin
+COPY configs/config.yaml.example /app/configs/config.yaml.example
+COPY configs/rbac_model.conf /app/configs/rbac_model.conf
+COPY migrations /app/migrations
+COPY web/admin/dist /app/web/admin/dist
+
+USER appuser
+EXPOSE 8088
+
+ENTRYPOINT ["/app/gotribe-admin"]

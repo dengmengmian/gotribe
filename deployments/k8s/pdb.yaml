@@ -1,0 +1,10 @@
+# 本文件定义应用在 Kubernetes 中的 PodDisruptionBudget。
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gotribe-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: gotribe-api

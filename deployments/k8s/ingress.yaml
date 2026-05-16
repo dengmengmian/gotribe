@@ -1,0 +1,22 @@
+# 本文件定义应用在 Kubernetes 中的 Ingress 入口规则。
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gotribe-api
+spec:
+  tls:
+    - hosts:
+        - gotribe.local
+      secretName: gotribe-api-tls
+  rules:
+    # 示例域名，实际部署时需要替换成真实域名。
+    - host: gotribe.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gotribe-api
+                port:
+                  number: 80

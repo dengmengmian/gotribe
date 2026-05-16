@@ -1,0 +1,47 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+docs/
+!docs/admin/swagger/
+*.md
+
+# Tests
+tests/
+*_test.go
+
+# Local configs (may contain secrets) — 生产部署时通过 volume 挂载覆盖
+.env
+.env.*
+
+# Build outputs
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Admin Web
+web/admin/node_modules/
+web/admin/.vite/
+web/admin/.cache/
+web/admin/pkg/
+
+# AI tools
+.omc/
+.claude/
