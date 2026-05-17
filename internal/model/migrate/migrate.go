@@ -42,6 +42,7 @@ func DBAutoMigrate(db *gorm.DB) {
 		&model.OperationLog{},
 		&model.ThirdPartyAccounts{},
 		&model.Feedback{},
+		&model.AdminTOTP{},
 	)
 	if err != nil {
 		panic(fmt.Sprintf("database migration failed: %v", err))

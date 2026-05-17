@@ -198,12 +198,19 @@ func registerAPIRoutes(engine *gin.Engine, infra *Infra, cfg coreconfig.Config, 
 	apiGroup.POST("/base/login", m.Auth.Login)
 	apiGroup.POST("/base/logout", m.Auth.Logout)
 	apiGroup.POST("/base/refreshToken", m.Auth.RefreshToken)
+	apiGroup.POST("/base/totp/verify", m.Auth.VerifyTOTP)
 	apiGroup.GET("/base/config", m.SystemConfig.Detail)
 
 	protected := apiGroup.Group("")
 	protected.Use(jwtMW)
 	protected.Use(adminLoader)
 	protected.Use(middleware.CasbinMiddleware(infra.Tx, infra.Enforcer, prefix))
+
+	protected.GET("/base/totp/status", m.Auth.StatusTOTP)
+	protected.POST("/base/totp/bind", m.Auth.BindTOTP)
+	protected.POST("/base/totp/confirm", m.Auth.ConfirmTOTP)
+	protected.DELETE("/base/totp", m.Auth.DeleteTOTP)
+	protected.POST("/admin/:id/totp/reset", m.Auth.AdminResetTOTP)
 
 	m.AI.RegisterRoutes(protected, authMiddleware)
 	m.Admin.RegisterRoutes(protected, authMiddleware)

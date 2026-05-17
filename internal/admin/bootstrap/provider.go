@@ -125,7 +125,8 @@ func NewAdminProviders(cfg coreconfig.Config) (*AdminProviders, error) {
 		CDNDomain:   cdnDomain,
 	}
 
-	modules := routes.BuildAdminModules(tx, enforcer, applog, authManager, cdnDomain, uploadCfg, redisClient, cfg.AI)
+	keys := cache.NewKeyBuilder(cfg.App.Name)
+	modules := routes.BuildAdminModules(tx, enforcer, applog, authManager, cdnDomain, uploadCfg, redisClient, cfg.AI, cfg.Admin, keys)
 
 	p := &AdminProviders{
 		Infra:   infra,

@@ -139,6 +139,42 @@ func Internal(message string, err error) error {
 	return New(CodeInternal, http.StatusInternalServerError, message, err)
 }
 
+// AccountLocked 创建账户已锁定错误，Details 携带 locked_until / remaining_seconds 字段。
+func AccountLocked(message string, lockedUntilUnix int64, remainingSeconds int64) error {
+	appErr := New(CodeAccountLocked, http.StatusTooManyRequests, message, nil)
+	appErr.Details = map[string]any{
+		"locked_until":      lockedUntilUnix,
+		"remaining_seconds": remainingSeconds,
+	}
+	return appErr
+}
+
+// TOTPRequired 创建需要 TOTP 二次校验的"业务态错误"，HTTP 200 由 handler 包装为正常响应。
+// 此函数仅用于内部传递阶段信息，handler 层不会直接把它转成错误响应。
+func TOTPRequired(stepToken string, stepExpiresUnix int64) error {
+	appErr := New(CodeTOTPRequired, http.StatusOK, "需要 TOTP 二次校验", nil)
+	appErr.Details = map[string]any{
+		"step_token":   stepToken,
+		"step_expires": stepExpiresUnix,
+	}
+	return appErr
+}
+
+// TOTPInvalid 创建 TOTP 校验失败错误。
+func TOTPInvalid(message string) error {
+	return New(CodeTOTPInvalid, http.StatusUnauthorized, message, nil)
+}
+
+// TOTPAlreadyBound 创建已绑定 TOTP 的冲突错误。
+func TOTPAlreadyBound(message string) error {
+	return New(CodeTOTPAlreadyBound, http.StatusConflict, message, nil)
+}
+
+// TOTPNotBound 创建未绑定 TOTP 的错误。
+func TOTPNotBound(message string) error {
+	return New(CodeTOTPNotBound, http.StatusBadRequest, message, nil)
+}
+
 // IsUniqueViolation 判断错误是否为数据库唯一约束冲突。
 func IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

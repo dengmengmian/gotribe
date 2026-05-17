@@ -21,4 +21,14 @@ const (
 	CodeUnavailable Code = "service_unavailable"
 	// CodeInternal indicates an unexpected internal server error occurred.
 	CodeInternal Code = "internal_error"
+	// CodeAccountLocked indicates the account is temporarily locked due to failed login attempts.
+	CodeAccountLocked Code = "account_locked"
+	// CodeTOTPRequired indicates the caller must complete TOTP second-factor verification.
+	CodeTOTPRequired Code = "totp_required"
+	// CodeTOTPInvalid indicates the submitted TOTP code or recovery code is wrong.
+	CodeTOTPInvalid Code = "totp_invalid"
+	// CodeTOTPAlreadyBound indicates the caller already bound a TOTP secret.
+	CodeTOTPAlreadyBound Code = "totp_already_bound"
+	// CodeTOTPNotBound indicates the caller has no active TOTP secret.
+	CodeTOTPNotBound Code = "totp_not_bound"
 )

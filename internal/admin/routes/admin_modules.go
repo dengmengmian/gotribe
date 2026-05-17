@@ -48,6 +48,7 @@ import (
 	authservice "gotribe/internal/auth/admin/service"
 
 	"gotribe/internal/auth/core"
+	"gotribe/internal/core/cache"
 	coreconfig "gotribe/internal/core/config"
 	"gotribe/internal/core/database"
 
@@ -84,9 +85,26 @@ type AdminModules struct {
 }
 
 // BuildAdminModules 装配全部 Admin 业务模块。
-func BuildAdminModules(tx *database.TransactionManager, enforcer *casbin.Enforcer, log *zap.SugaredLogger, authManager *core.Manager, cdnDomain string, uploadCfg resourceservice.UploadConfig, redisClient redis.UniversalClient, aiCfg coreconfig.AIConfig) *AdminModules {
+func BuildAdminModules(
+	tx *database.TransactionManager,
+	enforcer *casbin.Enforcer,
+	log *zap.SugaredLogger,
+	authManager *core.Manager,
+	cdnDomain string,
+	uploadCfg resourceservice.UploadConfig,
+	redisClient redis.UniversalClient,
+	aiCfg coreconfig.AIConfig,
+	adminCfg coreconfig.AdminConfig,
+	keys *cache.KeyBuilder,
+) *AdminModules {
+	lockout := authservice.NewLockoutTracker(adminCfg.Lockout, redisClient, keys)
+	totpSvc, err := authservice.NewTOTPService(adminCfg.TOTP, core.AudienceAdmin, tx, authManager, redisClient, keys)
+	if err != nil {
+		log.Fatalf("TOTP 服务初始化失败: %v", err)
+	}
+	authSvc := authservice.NewService(core.AudienceAdmin, tx, authManager, lockout, totpSvc, adminCfg.TOTP.StepTokenTTL())
 	return &AdminModules{
-		Auth:         authhandler.NewHandler(core.AudienceAdmin, authservice.NewService(core.AudienceAdmin, tx, authManager), authManager),
+		Auth:         authhandler.NewHandler(core.AudienceAdmin, authSvc, authManager, totpSvc),
 		AI:           aihandler.NewHandler(aiservice.NewService(aiCfg)),
 		Admin:        adminhandler.NewHandler(adminservice.NewService(tx, enforcer)),
 		Role:         rolehandler.NewHandler(roleservice.NewService(tx, enforcer)),

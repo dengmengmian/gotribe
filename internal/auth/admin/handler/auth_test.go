@@ -22,13 +22,13 @@ import (
 
 // mockAuthService 模拟 auth.Service
 type mockAuthService struct {
-	loginFunc   func(ctx context.Context, username, password string) (*authservice.LoginResult, error)
+	loginFunc   func(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error)
 	refreshFunc func(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error)
 }
 
-func (m *mockAuthService) Login(ctx context.Context, username, password string) (*authservice.LoginResult, error) {
+func (m *mockAuthService) Login(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error) {
 	if m.loginFunc != nil {
-		return m.loginFunc(ctx, username, password)
+		return m.loginFunc(ctx, username, password, clientIP)
 	}
 	return nil, errors.New("login not implemented")
 }
@@ -57,7 +57,7 @@ func setupTestHandler(t *testing.T) (*Handler, *core.Manager) {
 	gin.SetMode(gin.TestMode)
 	manager := newTestManager(t, time.Hour)
 	svc := &mockAuthService{}
-	h := NewHandler(core.AudienceAdmin, svc, manager)
+	h := NewHandler(core.AudienceAdmin, svc, manager, nil)
 	return h, manager
 }
 
@@ -66,7 +66,7 @@ func TestHandler_Login(t *testing.T) {
 
 	t.Run("登录成功", func(t *testing.T) {
 		h.authService = &mockAuthService{
-			loginFunc: func(ctx context.Context, username, password string) (*authservice.LoginResult, error) {
+			loginFunc: func(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error) {
 				return &authservice.LoginResult{
 					Token:   "fake-token",
 					Expires: time.Now().Add(time.Hour),
@@ -102,7 +102,7 @@ func TestHandler_Login(t *testing.T) {
 
 	t.Run("用户名或密码错误", func(t *testing.T) {
 		h.authService = &mockAuthService{
-			loginFunc: func(ctx context.Context, username, password string) (*authservice.LoginResult, error) {
+			loginFunc: func(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error) {
 				return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "密码错误", nil)
 			},
 		}
@@ -121,7 +121,7 @@ func TestHandler_Login(t *testing.T) {
 
 	t.Run("服务内部错误", func(t *testing.T) {
 		h.authService = &mockAuthService{
-			loginFunc: func(ctx context.Context, username, password string) (*authservice.LoginResult, error) {
+			loginFunc: func(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error) {
 				return nil, errors.New("db connection failed")
 			},
 		}

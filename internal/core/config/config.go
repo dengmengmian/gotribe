@@ -142,6 +142,44 @@ type AdminConfig struct {
 	Upload        UploadConfig         `mapstructure:"upload"`
 	BaiduPush     BaiduPushConfig      `mapstructure:"baidu_push"`
 	Jobs          AdminJobsConfig      `mapstructure:"jobs"`
+	Lockout       AdminLockoutConfig   `mapstructure:"lockout"`
+	TOTP          AdminTOTPConfig      `mapstructure:"totp"`
+}
+
+// AdminLockoutConfig 定义登录失败锁定策略。
+type AdminLockoutConfig struct {
+	Enabled            bool `mapstructure:"enabled"`
+	AccountMaxFails    int  `mapstructure:"account_max_fails"`
+	AccountLockMinutes int  `mapstructure:"account_lock_minutes"`
+	IPMaxFails         int  `mapstructure:"ip_max_fails"`
+	IPLockMinutes      int  `mapstructure:"ip_lock_minutes"`
+}
+
+// AccountLockDuration 返回账户级锁定时长。
+func (c AdminLockoutConfig) AccountLockDuration() time.Duration {
+	return time.Duration(c.AccountLockMinutes) * time.Minute
+}
+
+// IPLockDuration 返回 IP 级锁定时长。
+func (c AdminLockoutConfig) IPLockDuration() time.Duration {
+	return time.Duration(c.IPLockMinutes) * time.Minute
+}
+
+// AdminTOTPConfig 定义 TOTP 二次校验相关配置。
+// 注意：SecretEncryptionKey 必须为 32 字节字符串（AES-256-GCM），生产环境通过环境变量注入。
+type AdminTOTPConfig struct {
+	Issuer              string `mapstructure:"issuer"`
+	SecretEncryptionKey string `mapstructure:"secret_encryption_key"`
+	RecoveryCodesCount  int    `mapstructure:"recovery_codes_count"`
+	StepTokenTTLSeconds int    `mapstructure:"step_token_ttl_seconds"`
+	Period              int    `mapstructure:"period"`
+	Digits              int    `mapstructure:"digits"`
+	Skew                int    `mapstructure:"skew"`
+}
+
+// StepTokenTTL 返回 step_token 时长。
+func (c AdminTOTPConfig) StepTokenTTL() time.Duration {
+	return time.Duration(c.StepTokenTTLSeconds) * time.Second
 }
 
 // AdminLogsConfig 定义 Admin 端日志配置。
@@ -306,6 +344,19 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("ai.timeout_seconds", 30)
 
 	v.SetDefault("admin.sync_seed_data", false)
+
+	v.SetDefault("admin.lockout.enabled", true)
+	v.SetDefault("admin.lockout.account_max_fails", 5)
+	v.SetDefault("admin.lockout.account_lock_minutes", 15)
+	v.SetDefault("admin.lockout.ip_max_fails", 20)
+	v.SetDefault("admin.lockout.ip_lock_minutes", 60)
+
+	v.SetDefault("admin.totp.issuer", "GoTribe 管理后台")
+	v.SetDefault("admin.totp.recovery_codes_count", 10)
+	v.SetDefault("admin.totp.step_token_ttl_seconds", 300)
+	v.SetDefault("admin.totp.period", 30)
+	v.SetDefault("admin.totp.digits", 6)
+	v.SetDefault("admin.totp.skew", 1)
 }
 
 // Address 返回 HTTP 服务监听地址。
@@ -468,6 +519,53 @@ func validate(cfg Config) error {
 	}
 	if err := validateAuthAudience("auth.admin", cfg.Auth.Admin); err != nil {
 		return err
+	}
+	if cfg.Admin.Lockout.Enabled {
+		if cfg.Admin.Lockout.AccountMaxFails <= 0 {
+			return fmt.Errorf("admin.lockout.account_max_fails must be positive")
+		}
+		if cfg.Admin.Lockout.AccountLockMinutes <= 0 {
+			return fmt.Errorf("admin.lockout.account_lock_minutes must be positive")
+		}
+		if cfg.Admin.Lockout.IPMaxFails <= 0 {
+			return fmt.Errorf("admin.lockout.ip_max_fails must be positive")
+		}
+		if cfg.Admin.Lockout.IPLockMinutes <= 0 {
+			return fmt.Errorf("admin.lockout.ip_lock_minutes must be positive")
+		}
+	}
+	if err := validateTOTP(cfg.Admin.TOTP); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateTOTP 校验 TOTP 配置：encryption key 必须是 32 字节（AES-256-GCM 要求），其余正数即可。
+func validateTOTP(cfg AdminTOTPConfig) error {
+	key := strings.TrimSpace(cfg.SecretEncryptionKey)
+	if key == "" {
+		return fmt.Errorf("admin.totp.secret_encryption_key is required (32 bytes for AES-256-GCM)")
+	}
+	if len(key) != 32 {
+		return fmt.Errorf("admin.totp.secret_encryption_key must be exactly 32 bytes, got %d", len(key))
+	}
+	if strings.TrimSpace(cfg.Issuer) == "" {
+		return fmt.Errorf("admin.totp.issuer is required")
+	}
+	if cfg.RecoveryCodesCount <= 0 {
+		return fmt.Errorf("admin.totp.recovery_codes_count must be positive")
+	}
+	if cfg.StepTokenTTLSeconds <= 0 {
+		return fmt.Errorf("admin.totp.step_token_ttl_seconds must be positive")
+	}
+	if cfg.Period <= 0 {
+		return fmt.Errorf("admin.totp.period must be positive")
+	}
+	if cfg.Digits != 6 && cfg.Digits != 8 {
+		return fmt.Errorf("admin.totp.digits must be 6 or 8")
+	}
+	if cfg.Skew < 0 {
+		return fmt.Errorf("admin.totp.skew must be >= 0")
 	}
 	return nil
 }

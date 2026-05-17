@@ -75,6 +75,22 @@ func (b *KeyBuilder) PostDetailKey(projectID, postID string) string {
 	return fmt.Sprintf("%s:post:detail:%s:%s", b.prefix, strings.TrimSpace(projectID), strings.TrimSpace(postID))
 }
 
+// AdminLoginFailAccountKey 返回 admin 账户维度登录失败计数键。
+// 使用 hash 隐藏明文用户名，避免 Redis 中泄露用户名枚举。
+func (b *KeyBuilder) AdminLoginFailAccountKey(username string) string {
+	return fmt.Sprintf("%s:admin:login_fail:account:%s", b.prefix, hash(strings.ToLower(strings.TrimSpace(username))))
+}
+
+// AdminLoginFailIPKey 返回 admin IP 维度登录失败计数键。
+func (b *KeyBuilder) AdminLoginFailIPKey(ip string) string {
+	return fmt.Sprintf("%s:admin:login_fail:ip:%s", b.prefix, hash(strings.TrimSpace(ip)))
+}
+
+// AdminTOTPStepJTIKey 返回 TOTP step_token 的 jti 黑名单键，用于防重放。
+func (b *KeyBuilder) AdminTOTPStepJTIKey(jti string) string {
+	return fmt.Sprintf("%s:admin:totp:step_jti:%s", b.prefix, strings.TrimSpace(jti))
+}
+
 // hash 计算字符串的稳定哈希值，用于生成较短的缓存键后缀。
 func hash(raw string) string {
 	sum := sha256.Sum256([]byte(raw))

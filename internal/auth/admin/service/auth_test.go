@@ -66,7 +66,7 @@ func TestNewService(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	tx := database.NewTransactionManager(db)
-	svc := NewService(core.AudienceAdmin, tx, newTestManager(t))
+	svc := NewService(core.AudienceAdmin, tx, newTestManager(t), nil, nil, 5*time.Minute)
 	require.NotNil(t, svc)
 }
 
@@ -75,11 +75,11 @@ func TestAuthService_Login(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute)
 	ctx := context.Background()
 
 	t.Run("登录成功", func(t *testing.T) {
-		result, err := svc.Login(ctx, admin.Username, "Gotribe!23456")
+		result, err := svc.Login(ctx, admin.Username, "Gotribe!23456", "127.0.0.1")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.NotEmpty(t, result.Token)
@@ -93,7 +93,7 @@ func TestAuthService_Login(t *testing.T) {
 	})
 
 	t.Run("密码错误", func(t *testing.T) {
-		result, err := svc.Login(ctx, admin.Username, "wrongpassword")
+		result, err := svc.Login(ctx, admin.Username, "wrongpassword", "127.0.0.1")
 		require.Error(t, err)
 		require.Nil(t, result)
 		var ae *errs.AppError
@@ -102,7 +102,7 @@ func TestAuthService_Login(t *testing.T) {
 	})
 
 	t.Run("用户不存在", func(t *testing.T) {
-		result, err := svc.Login(ctx, "nonexistent", "Gotribe!23456")
+		result, err := svc.Login(ctx, "nonexistent", "Gotribe!23456", "127.0.0.1")
 		require.Error(t, err)
 		require.Nil(t, result)
 		var ae *errs.AppError
@@ -116,7 +116,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute)
 	ctx := context.Background()
 
 	t.Run("刷新成功", func(t *testing.T) {

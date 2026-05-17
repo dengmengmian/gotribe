@@ -4,69 +4,139 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	adminrepo "gotribe/internal/admin/admin_user/repository"
 	"gotribe/internal/auth/core"
 	"gotribe/internal/core/database"
+	"gotribe/internal/core/errs"
 	"gotribe/internal/model"
 )
 
 // Service 认证业务逻辑接口
 type Service interface {
-	Login(ctx context.Context, username, password string) (*LoginResult, error)
+	Login(ctx context.Context, username, password, clientIP string) (*LoginResult, error)
 	Refresh(ctx context.Context, userID int64, username string) (*LoginResult, error)
 }
 
-// LoginResult 登录/刷新响应数据
+// LoginStage 表示登录流程当前所处阶段。
+type LoginStage string
+
+const (
+	// LoginStageOK 表示登录已完成，Token 字段为可用的 access_token。
+	LoginStageOK LoginStage = "ok"
+	// LoginStageTOTPRequired 表示需要进行 TOTP 二次校验，StepToken 字段为短期凭证。
+	LoginStageTOTPRequired LoginStage = "totp_required"
+)
+
+// LoginResult 登录/刷新响应数据。字段按 Stage 取值不同而填充：
+//   - Stage=ok          : Token / Expires / User 有效；可能附带 MFAReminder=true
+//   - Stage=totp_required: StepToken / StepExpires 有效
 type LoginResult struct {
-	Token   string
-	Expires time.Time
-	User    *model.Admin
+	Stage       LoginStage
+	Token       string
+	Expires     time.Time
+	StepToken   string
+	StepExpires time.Time
+	MFAReminder bool
+	User        *model.Admin
 }
 
 // service 认证业务逻辑实现
 type service struct {
-	audience  string
-	adminRepo *adminrepo.Repository
-	manager   *core.Manager
+	audience     string
+	adminRepo    *adminrepo.Repository
+	manager      *core.Manager
+	lockout      *LockoutTracker
+	totpService  TOTPService
+	stepTokenTTL time.Duration
 }
 
 // NewService 创建认证服务实例。audience 通常传 core.AudienceAdmin。
-func NewService(audience string, tx *database.TransactionManager, manager *core.Manager) Service {
+// lockout 与 totpService 可为 nil（用于过渡期或单测），但建议生产环境注入。
+func NewService(
+	audience string,
+	tx *database.TransactionManager,
+	manager *core.Manager,
+	lockout *LockoutTracker,
+	totpService TOTPService,
+	stepTokenTTL time.Duration,
+) Service {
 	return &service{
-		audience:  audience,
-		adminRepo: adminrepo.NewRepository(tx),
-		manager:   manager,
+		audience:     audience,
+		adminRepo:    adminrepo.NewRepository(tx),
+		manager:      manager,
+		lockout:      lockout,
+		totpService:  totpService,
+		stepTokenTTL: stepTokenTTL,
 	}
 }
 
-// Login 用户登录，验证身份并签发 JWT
-func (s *service) Login(ctx context.Context, username, password string) (*LoginResult, error) {
-	u := &model.Admin{
-		Username: username,
-		Password: password,
+// Login 用户登录，验证身份并按状态决定是否签发 JWT 或要求 TOTP 二次校验。
+// 流程：
+//  1. 锁定预检（账户/IP 任一被锁则拒绝）
+//  2. 密码校验失败 → 计数 + 返回错误
+//  3. 密码校验成功 → 重置账户计数
+//     a. 未启用 TOTP → 直接签发 access_token，附带 MFAReminder=true
+//     b. 已启用 TOTP → 返回 step_token，stage=totp_required
+func (s *service) Login(ctx context.Context, username, password, clientIP string) (*LoginResult, error) {
+	if s.lockout != nil {
+		if err := s.lockout.CheckBeforeLogin(ctx, username, clientIP); err != nil {
+			var locked *LockedError
+			if errors.As(err, &locked) {
+				return nil, errs.AccountLocked("账户被临时锁定，请稍后再试", locked.LockedUntil.Unix(), locked.RemainingSeconds)
+			}
+			return nil, err
+		}
 	}
 
+	u := &model.Admin{Username: username, Password: password}
 	user, err := s.adminRepo.Login(ctx, u)
 	if err != nil {
+		if s.lockout != nil {
+			_, locked := s.lockout.RecordFailure(ctx, username, clientIP)
+			if locked != nil {
+				return nil, errs.AccountLocked("失败次数过多，账户已被临时锁定", locked.LockedUntil.Unix(), locked.RemainingSeconds)
+			}
+		}
 		return nil, err
 	}
 
-	subject := core.Subject{
-		UserID:   user.ID,
-		Username: user.Username,
+	if s.lockout != nil {
+		s.lockout.Reset(ctx, username)
 	}
+
+	if s.totpService != nil {
+		bound, err := s.totpService.IsBound(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		if bound {
+			token, _, expires, err := s.manager.SignStepToken(user.ID, user.Username, core.StepTokenPurposeTOTPVerify, s.stepTokenTTL)
+			if err != nil {
+				return nil, errs.Internal("生成 step token 失败", err)
+			}
+			return &LoginResult{
+				Stage:       LoginStageTOTPRequired,
+				StepToken:   token,
+				StepExpires: expires,
+			}, nil
+		}
+	}
+
+	subject := core.Subject{UserID: user.ID, Username: user.Username}
 	token, expires, err := s.manager.SignAccessToken(s.audience, subject)
 	if err != nil {
 		return nil, fmt.Errorf("生成token失败: %w", err)
 	}
-
 	return &LoginResult{
-		Token:   token,
-		Expires: expires,
-		User:    user,
+		Stage:       LoginStageOK,
+		Token:       token,
+		Expires:     expires,
+		MFAReminder: s.totpService != nil, // 仅当系统启用了 TOTP 才提示绑定
+		User:        user,
 	}, nil
 }
 
@@ -82,6 +152,7 @@ func (s *service) Refresh(ctx context.Context, userID int64, username string) (*
 	}
 
 	return &LoginResult{
+		Stage:   LoginStageOK,
 		Token:   token,
 		Expires: expires,
 	}, nil

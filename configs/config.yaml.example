@@ -250,3 +250,32 @@ admin:
         enabled: false
         timeout: 60s
         retry_count: 1
+
+  # 登录失败锁定（按账户 + IP 双维度计数，Redis 故障时 fail-open 不阻断登录）
+  lockout:
+    # 是否启用锁定逻辑
+    enabled: true
+    # 账户维度：N 次失败 → 锁 M 分钟
+    account_max_fails: 5
+    account_lock_minutes: 15
+    # IP 维度：N 次失败 → 锁 M 分钟（防单 IP 扫多个账户）
+    ip_max_fails: 20
+    ip_lock_minutes: 60
+
+  # TOTP 二次校验（opt-in，与 Google/Microsoft Authenticator、1Password 等 RFC 6238 客户端兼容）
+  totp:
+    # otpauth URL 中显示的 issuer，名字会出现在 Authenticator 应用里
+    issuer: "GoTribe 管理后台"
+    # AES-256-GCM 加密 secret 用的密钥，必须 32 字节，启动时校验。
+    # 生产环境用 `openssl rand -hex 16` 生成；本地开发可填任意 32 字节占位串。
+    secret_encryption_key: "replace-with-32-byte-random-key!"
+    # 一次性备份码个数（仅在 Bind 时一次性返回明文）
+    recovery_codes_count: 10
+    # 登录后两步校验用的 step_token TTL（秒）
+    step_token_ttl_seconds: 300
+    # TOTP 时间步长，标准为 30s
+    period: 30
+    # 验证码位数，6 或 8
+    digits: 6
+    # 允许 ±N 步时钟漂移，1 表示 ±30s
+    skew: 1

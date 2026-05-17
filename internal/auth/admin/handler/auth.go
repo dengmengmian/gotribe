@@ -18,12 +18,13 @@ import (
 type Handler struct {
 	audience    string
 	authService authservice.Service
+	totpService authservice.TOTPService
 	manager     *core.Manager
 }
 
 // NewHandler 创建认证处理器实例。audience 通常传 core.AudienceAdmin。
-func NewHandler(audience string, authService authservice.Service, manager *core.Manager) *Handler {
-	return &Handler{audience: audience, authService: authService, manager: manager}
+func NewHandler(audience string, authService authservice.Service, manager *core.Manager, totpService authservice.TOTPService) *Handler {
+	return &Handler{audience: audience, authService: authService, totpService: totpService, manager: manager}
 }
 
 // Login 用户登录
@@ -43,16 +44,27 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	result, err := h.authService.Login(c.Request.Context(), req.Username, req.Password)
+	result, err := h.authService.Login(c.Request.Context(), req.Username, req.Password, c.ClientIP())
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 
-	response.OK(c, gin.H{
-		"token":   result.Token,
-		"expires": result.Expires.Format(constant.TIME_FORMAT),
-	})
+	switch result.Stage {
+	case authservice.LoginStageTOTPRequired:
+		response.OK(c, gin.H{
+			"stage":        string(result.Stage),
+			"step_token":   result.StepToken,
+			"step_expires": result.StepExpires.Format(constant.TIME_FORMAT),
+		})
+	default:
+		response.OK(c, gin.H{
+			"stage":        string(authservice.LoginStageOK),
+			"token":        result.Token,
+			"expires":      result.Expires.Format(constant.TIME_FORMAT),
+			"mfa_reminder": result.MFAReminder,
+		})
+	}
 }
 
 // Logout 用户登出
