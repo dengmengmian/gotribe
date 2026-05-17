@@ -31,16 +31,21 @@ type Service struct {
 	uploader Uploader
 }
 
-// NewService 根据 provider 创建对应的上传服务实例
-// provider: qiniu(七牛) / oss(阿里云OSS) / s3(亚马逊S3，预留，当前返回未实现错误)
-func NewService(provider, endpoint, accessKeyId, accessKeySecret, bucketName string) (*Service, error) {
+// NewService 根据 provider 创建对应的上传服务实例。
+// provider: qiniu(七牛) / oss(阿里云OSS) / s3(亚马逊S3，预留，当前返回未实现错误)。
+// region 目前用于七牛，兼容旧调用所以保留为可选参数。
+func NewService(provider, endpoint, accessKeyId, accessKeySecret, bucketName string, region ...string) (*Service, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
+	regionID := ""
+	if len(region) > 0 {
+		regionID = region[0]
+	}
 	var uploader Uploader
 	switch provider {
 	case ProviderOSS:
 		uploader = NewOSS(endpoint, accessKeyId, accessKeySecret, bucketName)
 	case ProviderQiniu:
-		uploader = NewQiniu(accessKeyId, accessKeySecret, bucketName)
+		uploader = NewQiniu(accessKeyId, accessKeySecret, bucketName, regionID)
 	case ProviderS3:
 		return nil, errors.New("s3 上传尚未实现，请先使用 qiniu 或 oss")
 	default:

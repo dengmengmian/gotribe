@@ -13,7 +13,7 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -X 'gotribe/internal/buildinfo.Version=$(VERSION)' -X 'gotribe/internal/buildinfo.Commit=$(COMMIT)' -X 'gotribe/internal/buildinfo.BuildTime=$(BUILD_TIME)'
 
-.PHONY: run run-api run-admin run-all tidy fmt test-unit pre-deploy build build-api build-admin build-admin-web lint vet bench bench-http bench-mem dev-db-reset
+.PHONY: run run-api run-admin run-all tidy fmt test-unit pre-deploy build build-api build-admin build-admin-web build-linux build-admin-linux build-linux-arm64 build-admin-linux-arm64 package-linux package-linux-arm64 lint vet bench bench-http bench-mem dev-db-reset
 
 # 本地直接启动 API 应用。
 run:
@@ -75,7 +75,7 @@ build:
 build-api: build
 
 # 构建 Admin 后台可执行文件到 bin 目录（当前平台）。
-build-admin:
+build-admin: build-admin-web
 	GOPROXY=$(GOPROXY) go build -ldflags="$(LDFLAGS)" -o bin/$(ADMIN_NAME) ./cmd/admin
 
 # 构建 admin 前端静态资源（需要 pnpm）。
@@ -115,9 +115,25 @@ dev-db-reset:
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOPROXY=$(GOPROXY) go build -ldflags="$(LDFLAGS) -s -w" -o bin/$(APP_NAME)-linux-amd64 ./cmd/api
 
+# 交叉编译 Admin Linux AMD64 版本（用于服务器部署）。
+build-admin-linux: build-admin-web
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOPROXY=$(GOPROXY) go build -ldflags="$(LDFLAGS) -s -w" -o bin/$(ADMIN_NAME)-linux-amd64 ./cmd/admin
+
 # 交叉编译 Linux ARM64 版本（用于 ARM 服务器部署）。
 build-linux-arm64:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOPROXY=$(GOPROXY) go build -ldflags="$(LDFLAGS) -s -w" -o bin/$(APP_NAME)-linux-arm64 ./cmd/api
+
+# 交叉编译 Admin Linux ARM64 版本（用于 ARM 服务器部署）。
+build-admin-linux-arm64: build-admin-web
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOPROXY=$(GOPROXY) go build -ldflags="$(LDFLAGS) -s -w" -o bin/$(ADMIN_NAME)-linux-arm64 ./cmd/admin
+
+# 打包 Linux AMD64 发布包（不包含 configs/config.yaml，避免覆盖线上配置）。
+package-linux:
+	bash scripts/package-linux.sh amd64
+
+# 打包 Linux ARM64 发布包（不包含 configs/config.yaml，避免覆盖线上配置）。
+package-linux-arm64:
+	bash scripts/package-linux.sh arm64
 
 # 运行全部 benchmark 测试。
 bench:

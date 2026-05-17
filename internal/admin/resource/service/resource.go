@@ -4,11 +4,11 @@ import (
 	"context"
 	"mime/multipart"
 
-	"gotribe/internal/model"
 	"gotribe/internal/admin/resource/dto"
 	"gotribe/internal/admin/resource/repository"
 	"gotribe/internal/admin/util"
 	"gotribe/internal/admin/util/upload"
+	"gotribe/internal/model"
 
 	"go.uber.org/zap"
 	"gotribe/internal/core/database"
@@ -21,6 +21,7 @@ type UploadConfig struct {
 	AccessKey string
 	SecretKey string
 	Bucket    string
+	Region    string
 	CDNDomain string
 }
 
@@ -37,8 +38,8 @@ type Service interface {
 // service 资源业务逻辑实现
 type service struct {
 	resourceRepo *repository.Repository
-	uploadCfg     UploadConfig
-	log           *zap.SugaredLogger
+	uploadCfg    UploadConfig
+	log          *zap.SugaredLogger
 }
 
 // NewService 创建资源服务实例
@@ -96,6 +97,7 @@ func (s *service) Delete(ctx context.Context, ids []int64) error {
 			s.uploadCfg.AccessKey,
 			s.uploadCfg.SecretKey,
 			s.uploadCfg.Bucket,
+			s.uploadCfg.Region,
 		)
 		if err != nil {
 			s.log.Errorf("Failed to create upload service for deleting resource %d: %v", id, err)
@@ -117,6 +119,7 @@ func (s *service) Upload(ctx context.Context, fileHeader *multipart.FileHeader) 
 		s.uploadCfg.AccessKey,
 		s.uploadCfg.SecretKey,
 		s.uploadCfg.Bucket,
+		s.uploadCfg.Region,
 	)
 	if err != nil {
 		return nil, nil, err

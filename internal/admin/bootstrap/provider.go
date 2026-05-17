@@ -194,6 +194,7 @@ func resolveUploadConfig(cfg coreconfig.Config) (resourceservice.UploadConfig, s
 		AccessKey: uploadConfig.AccessKey,
 		SecretKey: uploadConfig.SecretKey,
 		Bucket:    uploadConfig.Bucket,
+		Region:    uploadConfig.Region,
 		CDNDomain: cdnDomain,
 	}
 	if uploadCfg.Provider == "" {

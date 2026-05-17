@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -28,11 +29,23 @@ type service struct {
 
 // NewService 创建仪表盘服务实例。
 func NewService(tx *database.TransactionManager, redis redis.UniversalClient) Service {
+	redis = normalizeRedisClient(redis)
 	return &service{
 		indexRepo: repository.NewRepository(tx),
 		tx:        tx,
 		redis:     redis,
 	}
+}
+
+func normalizeRedisClient(client redis.UniversalClient) redis.UniversalClient {
+	if client == nil {
+		return nil
+	}
+	value := reflect.ValueOf(client)
+	if value.Kind() == reflect.Ptr && value.IsNil() {
+		return nil
+	}
+	return client
 }
 
 // Dashboard 并发聚合仪表盘全量数据。

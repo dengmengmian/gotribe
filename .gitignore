@@ -3,6 +3,8 @@
 # === Go 构建输出 ===
 # 本地构建输出目录。
 bin/
+# 本地发布包输出目录。
+release/
 # 可执行文件（Windows）。
 *.exe
 *.exe~
@@ -76,7 +78,8 @@ temp/
 # === 前端构建产物 ===
 # admin 前端 node_modules 和构建输出（pnpm 管理，不提交）。
 web/admin/node_modules/
-web/admin/dist/
+web/admin/dist/*
+!web/admin/dist/keep.txt
 web/admin/.vite/
 web/admin/.cache/
 .pnpm-store/

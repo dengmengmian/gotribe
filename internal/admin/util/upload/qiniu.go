@@ -2,9 +2,11 @@ package upload
 
 import (
 	"context"
+	"errors"
 	"mime/multipart"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/qiniu/go-sdk/v7/auth/qbox"
@@ -16,14 +18,20 @@ type QiniuUploader struct {
 	AccessKey string
 	SecretKey string
 	Bucket    string
+	Region    string
 }
 
 // NewQiniu 构造函数
-func NewQiniu(ak, sk, bucket string) QiniuUploader {
+func NewQiniu(ak, sk, bucket string, region ...string) QiniuUploader {
+	regionID := ""
+	if len(region) > 0 {
+		regionID = strings.TrimSpace(region[0])
+	}
 	return QiniuUploader{
 		AccessKey: ak,
 		SecretKey: sk,
 		Bucket:    bucket,
+		Region:    regionID,
 	}
 }
 
@@ -38,11 +46,17 @@ func (q QiniuUploader) UploadFile(file *multipart.FileHeader) (UploadResource, e
 	putPolicy := storage.PutPolicy{Scope: q.Bucket}
 	mac := qbox.NewMac(q.AccessKey, q.SecretKey)
 	upToken := putPolicy.UploadToken(mac)
-	// 配置参数
+	// 配置参数。region 为空时交给 SDK 根据 AK 与 bucket 自动查询区域。
 	cfg := storage.Config{
-		Zone:          &storage.ZoneHuanan, // 华南区
 		UseCdnDomains: false,
 		UseHTTPS:      false, // 非https
+	}
+	if q.Region != "" {
+		region, ok := storage.GetRegionByID(storage.RegionID(q.Region))
+		if !ok {
+			return UploadResource{}, errors.New("不支持的七牛上传区域: " + q.Region + "，可选: z0, z1, z2, na0, as0, cn-east-2")
+		}
+		cfg.Region = &region
 	}
 
 	formUploader := storage.NewFormUploader(&cfg)
@@ -73,6 +87,13 @@ func (q QiniuUploader) DeleteFile(key string) error {
 	cfg := storage.Config{
 		// 是否使用https域名进行资源管理
 		UseHTTPS: false,
+	}
+	if q.Region != "" {
+		region, ok := storage.GetRegionByID(storage.RegionID(q.Region))
+		if !ok {
+			return errors.New("不支持的七牛上传区域: " + q.Region + "，可选: z0, z1, z2, na0, as0, cn-east-2")
+		}
+		cfg.Region = &region
 	}
 	bucketManager := storage.NewBucketManager(mac, &cfg)
 	err := bucketManager.Delete(q.Bucket, key)

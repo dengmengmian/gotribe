@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gotribe/internal/admin/post/dto"
 	"gotribe/internal/core/database"
@@ -13,6 +14,8 @@ import (
 
 	"gorm.io/gorm"
 )
+
+var ErrInvalidTagID = errors.New("无效的标签ID")
 
 type Repository struct {
 	tx *database.TransactionManager
@@ -291,7 +294,7 @@ func parsePostTagIDs(raw string) ([]int64, error) {
 		}
 		tagID, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("无效的标签ID: %s", value)
+			return nil, fmt.Errorf("%w: %s", ErrInvalidTagID, value)
 		}
 
 		if _, ok := seen[tagID]; ok {
@@ -305,6 +308,10 @@ func parsePostTagIDs(raw string) ([]int64, error) {
 		return tagIDs[i] < tagIDs[j]
 	})
 	return tagIDs, nil
+}
+
+func IsInvalidTagIDError(err error) bool {
+	return errors.Is(err, ErrInvalidTagID)
 }
 
 func formatPostTagIDs(tags []*model.Tag) string {

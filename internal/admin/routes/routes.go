@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +17,7 @@ import (
 	coreconfig "gotribe/internal/core/config"
 	"gotribe/internal/core/database"
 	appMiddleware "gotribe/internal/core/middleware"
+	adminweb "gotribe/web/admin"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-contrib/static"
@@ -83,18 +86,40 @@ func setupMiddlewares(engine *gin.Engine, infra *Infra, cfg coreconfig.Config) {
 
 func setupStaticFiles(engine *gin.Engine, infra *Infra) {
 	webDist := os.Getenv("GOTRIBE_ADMIN_WEB_DIST")
-	if webDist == "" {
-		webDist = "web/admin/dist"
+	if webDist != "" {
+		setupLocalStaticFiles(engine, infra, webDist)
+		return
 	}
 
+	distFS, err := fs.Sub(adminweb.Dist, "dist")
+	if err != nil {
+		infra.Log.Warnf("读取内嵌 Admin 前端资源失败：%v", err)
+		setupLocalStaticFiles(engine, infra, "web/admin/dist")
+		return
+	}
+
+	indexData, err := fs.ReadFile(distFS, "index.html")
+	if err != nil {
+		infra.Log.Warnf("读取内嵌 Admin index.html 失败：%v", err)
+	}
+
+	engine.Use(embeddedStaticMiddleware(distFS))
+	setupSPAFallback(engine, indexData)
+}
+
+func setupLocalStaticFiles(engine *gin.Engine, infra *Infra, webDist string) {
 	indexPath := filepath.Join(webDist, "index.html")
 	indexData, err := os.ReadFile(indexPath)
 	if err != nil {
 		infra.Log.Warnf("读取 %s 失败：%v", indexPath, err)
 	}
 
+	engine.Use(staticCacheControlMiddleware())
 	engine.Use(static.Serve("/", static.LocalFile(webDist, false)))
+	setupSPAFallback(engine, indexData)
+}
 
+func setupSPAFallback(engine *gin.Engine, indexData []byte) {
 	engine.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
 		for _, prefix := range nonSPAPathPrefixes {
@@ -104,12 +129,59 @@ func setupStaticFiles(engine *gin.Engine, infra *Infra) {
 			}
 		}
 		if len(indexData) > 0 {
+			setAdminStaticCacheHeaders(c, "index.html")
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.String(http.StatusOK, string(indexData))
 		} else {
 			c.String(http.StatusNotFound, "Index file not found")
 		}
 	})
+}
+
+func embeddedStaticMiddleware(distFS fs.FS) gin.HandlerFunc {
+	fileServer := http.FileServer(http.FS(distFS))
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Next()
+			return
+		}
+
+		path := strings.TrimPrefix(c.Request.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+		if _, err := fs.Stat(distFS, path); err != nil {
+			c.Next()
+			return
+		}
+
+		if contentType := mime.TypeByExtension(filepath.Ext(path)); contentType != "" {
+			c.Header("Content-Type", contentType)
+		}
+		setAdminStaticCacheHeaders(c, path)
+		fileServer.ServeHTTP(c.Writer, c.Request)
+		c.Abort()
+	}
+}
+
+func staticCacheControlMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+			setAdminStaticCacheHeaders(c, strings.TrimPrefix(c.Request.URL.Path, "/"))
+		}
+		c.Next()
+	}
+}
+
+func setAdminStaticCacheHeaders(c *gin.Context, path string) {
+	switch {
+	case path == "" || path == "index.html" || path == "sw.js":
+		c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+	case strings.HasPrefix(path, "assets/"):
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	}
 }
 
 func setupSwaggerRoutes(engine *gin.Engine) {

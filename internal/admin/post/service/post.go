@@ -6,14 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"gotribe/internal/core/constant"
+	"go.uber.org/zap"
 	"gotribe/internal/admin/post/dto"
 	postRepository "gotribe/internal/admin/post/repository"
 	projectRepo "gotribe/internal/admin/project/repository"
+	"gotribe/internal/core/constant"
 	"gotribe/internal/core/database"
-	"gotribe/internal/model"
+	"gotribe/internal/core/errs"
 	"gotribe/internal/core/util"
-	"go.uber.org/zap"
+	"gotribe/internal/model"
 )
 
 // Service 内容业务逻辑接口
@@ -98,7 +99,13 @@ func (s *postService) Create(ctx context.Context, req *dto.CreatePostRequest) er
 		Video:       req.Video,
 	}
 	return s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		return s.postRepo.Create(txCtx, &post)
+		if err := s.postRepo.Create(txCtx, &post); err != nil {
+			if postRepository.IsInvalidTagIDError(err) {
+				return errs.BadRequest(err.Error(), err)
+			}
+			return err
+		}
+		return nil
 	})
 }
 
@@ -147,7 +154,13 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 	oldPost.Video = req.Video
 	oldPost.ShowTime = showTime
 	return s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		return s.postRepo.Update(txCtx, &oldPost)
+		if err := s.postRepo.Update(txCtx, &oldPost); err != nil {
+			if postRepository.IsInvalidTagIDError(err) {
+				return errs.BadRequest(err.Error(), err)
+			}
+			return err
+		}
+		return nil
 	})
 }
 
