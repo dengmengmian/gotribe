@@ -18,6 +18,7 @@ tags:
   - name: Profile
   - name: Examples
   - name: Posts
+  - name: Categories
   - name: UserEvents
 
 paths:
@@ -372,6 +373,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+            format: int64
       responses:
         '200':
           description: Post list
@@ -420,6 +426,35 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /api/v1/categories/{parent_id}:
+    get:
+      tags: [Categories]
+      summary: List categories by parent ID
+      security: []
+      parameters:
+        - name: parent_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Category list
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/XRateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/XRateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/XRateLimitReset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /api/v1/user-events:
     post:
@@ -805,6 +840,47 @@ components:
         color:
           type: string
 
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        parent_id:
+          type: integer
+          format: int64
+        sort:
+          type: integer
+        icon:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        path:
+          type: string
+        hidden:
+          type: integer
+        description:
+          type: string
+        status:
+          type: integer
+        count:
+          type: integer
+
+    CategoryListEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            categories:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+        request_id:
+          type: string
+
     Post:
       type: object
       properties:
@@ -867,6 +943,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Tag'
+        category:
+          $ref: '#/components/schemas/Category'
         created_at:
           type: string
         updated_at:

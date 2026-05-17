@@ -397,15 +397,24 @@ logger.Error(ctx, ...)
 
 ## 缓存怎么写
 
-当前缓存统一走 `internal/cache.Store`。
+当前缓存统一走 `internal/core/cache.Store`。
 
 开发时注意：
 
-- cache key 统一通过 key builder 构造
+- cache key 统一通过 `KeyBuilder` 构造
 - 不要在业务代码里手拼 Redis key
 - 缓存只是优化，不是业务真相源
+- 列表缓存的 key 要包含所有查询参数，且分页参数需先 `NormalizePagination` 再生成 key
 
-如果更新了用户资料、帖子详情之类缓存相关数据，要记得处理缓存失效。
+### 当前已实现的缓存策略
+
+| 场景 | 缓存 TTL | 失效触发 |
+|------|---------|---------|
+| 文章详情 (`post:detail`) | `cacheTTL` 配置（默认 5 分钟） | 无自动失效，靠 TTL 过期 |
+| 文章列表 (`post:list`) | `cacheTTL` 配置（默认 5 分钟） | Admin 端 Create/Update/Delete/Publish 后主动清除 |
+| 用户资料 (`profile`) | `cacheTTL` 配置 | Profile Update 后主动清除 |
+
+列表缓存使用 `DeleteByPattern`（基于 `SCAN`）批量清除，避免 `KEYS` 阻塞 Redis。清除失败只记 warn 日志，不影响主流程。
 
 ## 数据库怎么写
 
