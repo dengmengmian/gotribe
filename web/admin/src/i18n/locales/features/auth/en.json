@@ -1,9 +1,23 @@
 {
   "layout": {
-    "appName": "Go-Gribe Admin"
+    "appName": "Go-Gribe Admin",
+    "workspaceLabel": "Admin workspace",
+    "headline": "Editorial operations, under control.",
+    "description": "Manage content, system settings, and team permissions from one focused workspace.",
+    "signalContentTitle": "Content",
+    "signalContentDescription": "Drafts, articles, columns",
+    "signalSystemTitle": "System",
+    "signalSystemDescription": "Roles, menus, API access",
+    "signalStatusTitle": "Signals",
+    "signalStatusDescription": "Logs and operational status"
   },
   "validation": {
     "usernameRequired": "Please enter your username",
     "passwordRequired": "Please enter your password"
+  },
+  "mfa": {
+    "reminderTitle": "Enable two-factor verification",
+    "reminderDescription": "Pair an authenticator app (Google / Microsoft / 1Password, etc.) so a leaked password alone cannot sign you in.",
+    "reminderAction": "Set up"
   }
 }

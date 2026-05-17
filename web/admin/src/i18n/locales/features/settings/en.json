@@ -2,7 +2,37 @@
   "title": "Personal Center",
   "description": "View and edit your profile and account security settings",
   "sidebar": {
-    "profile": "Profile"
+    "profile": "Profile",
+    "security": "Security"
+  },
+  "security": {
+    "title": "Account Security",
+    "desc": "Manage two-factor verification to protect against password leaks",
+    "totpTitle": "Two-factor verification (TOTP)",
+    "totpEnabledDesc": "Enabled. {{count}} recovery codes remaining. Sign-in will require a 6-digit code from your authenticator.",
+    "totpDisabledDesc": "Not enabled. We recommend pairing Google / Microsoft Authenticator / 1Password etc. so a leaked password alone cannot sign you in.",
+    "statusEnabled": "Enabled",
+    "statusDisabled": "Disabled",
+    "bindButton": "Set up",
+    "unbindButton": "Disable",
+    "bindTitle": "Set up two-factor verification",
+    "bindDescription": "Scan the QR with any TOTP authenticator (Google / Microsoft / 1Password etc.) and enter the 6-digit code shown to finish setup.",
+    "unbindTitle": "Disable two-factor verification",
+    "unbindDescription": "Enter the current 6-digit code from your authenticator to confirm. After disabling, sign-in will no longer require a second factor.",
+    "manualSecret": "Or enter this secret manually",
+    "recoveryWarningTitle": "Save these recovery codes now",
+    "recoveryWarningBody": "Each of the 10 codes below can be used once if you lose your authenticator. They will not be shown again — screenshot or copy them to a password manager.",
+    "copyAll": "Copy all recovery codes",
+    "confirmCodeLabel": "Enter the 6-digit code from your authenticator",
+    "cancel": "Cancel",
+    "confirmBind": "Confirm",
+    "confirmUnbind": "Confirm disable",
+    "bindSuccess": "Two-factor verification enabled",
+    "bindFailed": "Setup failed",
+    "unbindSuccess": "Two-factor verification disabled",
+    "unbindFailed": "Disable failed",
+    "copied": "Copied",
+    "copyFailed": "Copy failed"
   },
   "profile": {
     "title": "Profile",

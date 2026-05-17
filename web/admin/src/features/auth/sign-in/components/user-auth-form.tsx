@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2, LogIn } from 'lucide-react'
+import { Loader2, LogIn, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSetAccessToken, useSetAuthUser } from '@/stores/auth-store'
 import { useI18n } from '@/context/i18n-provider'
@@ -26,7 +26,7 @@ interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
   redirectTo?: string
 }
 
-const AUTH_ROUTES = ['/sign-in', '/sign-up', '/otp']
+const AUTH_ROUTES = ['/sign-in', '/otp']
 const DEFAULT_SIGN_IN_REDIRECT = '/dashboard'
 
 function resolveSignInRedirect(redirectTo?: string): string {
@@ -77,38 +77,61 @@ export function UserAuthForm({
     },
   })
 
+  async function completeLogin(token: string, username: string, showMfaReminder: boolean) {
+    setAccessToken(token)
+    let displayName = username
+    try {
+      const userInfoResult = await getCurrentUser()
+      if (userInfoResult && userInfoResult.admin) {
+        const admin = userInfoResult.admin as { nickname?: string; username?: string }
+        displayName = admin.nickname?.trim() || admin.username || username
+        setAuthUser({ ...userInfoResult.admin })
+      } else {
+        setAuthUser({})
+      }
+    } catch (error) {
+      setAuthUser({})
+      // eslint-disable-next-line no-console
+      console.error('Failed to get user info:', error)
+    }
+
+    const targetPath = resolveSignInRedirect(redirectTo)
+    navigate({ to: targetPath, replace: true })
+
+    if (showMfaReminder) {
+      // 登录成功但未绑 TOTP：提示一次，并提供「去绑定」入口；可关闭忽略
+      toast.warning(t('features.auth.mfa.reminderTitle'), {
+        description: t('features.auth.mfa.reminderDescription'),
+        action: {
+          label: t('features.auth.mfa.reminderAction'),
+          onClick: () => navigate({ to: '/personal-center' }),
+        },
+        duration: 8000,
+      })
+    }
+
+    return t('features.auth.signIn.welcomeBack', { username: displayName })
+  }
+
   function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
 
     toast.promise(
       login({ username: data.username, password: data.password }).then(async (result: LoginResult) => {
-        // 先存储 accessToken 到 localStorage
-        setAccessToken(result.token)
-        // 调用接口获取用户信息
-        let displayName = data.username
-        try {
-          const userInfoResult = await getCurrentUser()
-          if (userInfoResult && userInfoResult.admin) {
-            const admin = userInfoResult.admin as { nickname?: string; username?: string }
-            // 优先展示昵称，其次用户名
-            displayName = admin.nickname?.trim() || admin.username || data.username
-            setAuthUser({
-              ...userInfoResult.admin,
-            })
-          } else {
-            setAuthUser({})
+        if (result.stage === 'totp_required') {
+          if (!result.step_token) {
+            throw new Error(t('features.auth.signIn.error'))
           }
-        } catch (error) {
-          setAuthUser({})
-          // eslint-disable-next-line no-console
-          console.error('Failed to get user info:', error)
+          // 保存 step_token 到 sessionStorage，由 /otp 页消费
+          sessionStorage.setItem('totp_step_token', result.step_token)
+          sessionStorage.setItem('totp_step_redirect', redirectTo ?? '')
+          navigate({ to: '/otp', replace: true })
+          return t('features.auth.signIn.totpRequired')
         }
-
-        // 重定向到目标页面或默认到仪表板
-        const targetPath = resolveSignInRedirect(redirectTo)
-        navigate({ to: targetPath, replace: true })
-
-        return t('features.auth.signIn.welcomeBack', { username: displayName })
+        if (!result.token) {
+          throw new Error(t('features.auth.signIn.error'))
+        }
+        return completeLogin(result.token, data.username, Boolean(result.mfa_reminder))
       }),
       {
         loading: t('features.auth.signIn.loggingIn'),
@@ -128,7 +151,7 @@ export function UserAuthForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className={cn('grid gap-3', className)}
+        className={cn('grid gap-4', className)}
         {...props}
       >
         <FormField
@@ -138,7 +161,12 @@ export function UserAuthForm({
             <FormItem>
               <FormLabel>{t('features.auth.signIn.account')}</FormLabel>
               <FormControl>
-                <Input placeholder={t('features.auth.signIn.accountPlaceholder')} {...field} />
+                <Input
+                  autoComplete='username'
+                  className='h-10'
+                  placeholder={t('features.auth.signIn.accountPlaceholder')}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -150,19 +178,26 @@ export function UserAuthForm({
           render={({ field }) => (
             <FormItem className='relative'>
               <FormLabel>{t('features.auth.signIn.password')}</FormLabel>
-<FormControl>
-                  <PasswordInput placeholder={t('features.auth.signIn.passwordPlaceholder')} {...field} />
+              <FormControl>
+                <PasswordInput
+                  autoComplete='current-password'
+                  placeholder={t('features.auth.signIn.passwordPlaceholder')}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button className='mt-2' disabled={isLoading}>
+        <Button type='submit' size='lg' className='mt-1 w-full' disabled={isLoading}>
           {isLoading ? <Loader2 className='animate-spin' /> : <LogIn />}
           {t('features.auth.signIn.login')}
         </Button>
-        <p className='text-center text-xs text-muted-foreground'>
+        <p className='flex items-start gap-2 rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground'>
+          <ShieldCheck className='mt-0.5 size-4 shrink-0 text-foreground/70' />
+          <span>
           {redirectTo ? t('features.auth.signIn.redirectHint') : t('features.auth.signIn.securityHint')}
+          </span>
         </p>
       </form>
     </Form>

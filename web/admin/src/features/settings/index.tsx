@@ -1,6 +1,6 @@
 import { Outlet } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { UserCog } from 'lucide-react'
+import { UserCog, ShieldCheck } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 // import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -15,6 +15,11 @@ export function Settings() {
       title: t('features.settings.sidebar.profile'),
       href: '/personal-center',
       icon: <UserCog size={18} />,
+    },
+    {
+      title: t('features.settings.sidebar.security'),
+      href: '/personal-center/security',
+      icon: <ShieldCheck size={18} />,
     },
   ]
 

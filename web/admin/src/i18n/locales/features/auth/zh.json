@@ -1,9 +1,23 @@
 {
   "layout": {
-    "appName": "Go-Gribe Admin"
+    "appName": "Go-Gribe Admin",
+    "workspaceLabel": "管理后台工作台",
+    "headline": "内容运营，有序掌控。",
+    "description": "在一个专注的工作台里管理内容、系统配置与团队权限。",
+    "signalContentTitle": "内容",
+    "signalContentDescription": "草稿、文章、栏目",
+    "signalSystemTitle": "系统",
+    "signalSystemDescription": "角色、菜单、API 权限",
+    "signalStatusTitle": "状态",
+    "signalStatusDescription": "日志与运行信号"
   },
   "validation": {
     "usernameRequired": "请输入您的账户",
     "passwordRequired": "请输入您的密码"
+  },
+  "mfa": {
+    "reminderTitle": "建议绑定二次校验",
+    "reminderDescription": "绑定 Google / Microsoft Authenticator 等验证器，账户密码泄露时仍能拦阻登录。",
+    "reminderAction": "去绑定"
   }
 }

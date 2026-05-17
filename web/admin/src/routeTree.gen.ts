@@ -17,7 +17,6 @@ import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
-import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authOtpRouteImport } from './routes/(auth)/otp'
 import { Route as AuthenticatedPersonalCenterRouteRouteImport } from './routes/_authenticated/personal-center/route'
@@ -30,6 +29,7 @@ import { Route as AuthenticatedSystemApiRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSystemAdminRouteImport } from './routes/_authenticated/system/admin'
 import { Route as AuthenticatedPromotionSceneRouteImport } from './routes/_authenticated/promotion/scene'
 import { Route as AuthenticatedPromotionAdvertisingRouteImport } from './routes/_authenticated/promotion/advertising'
+import { Route as AuthenticatedPersonalCenterSecurityRouteImport } from './routes/_authenticated/personal-center/security'
 import { Route as AuthenticatedOperationPointRouteImport } from './routes/_authenticated/operation/point'
 import { Route as AuthenticatedOperationCommentRouteImport } from './routes/_authenticated/operation/comment'
 import { Route as AuthenticatedContentTagRouteImport } from './routes/_authenticated/content/tag'
@@ -80,11 +80,6 @@ const errors403Route = errors403RouteImport.update({
 const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authSignUpRoute = authSignUpRouteImport.update({
-  id: '/(auth)/sign-up',
-  path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authSignInRoute = authSignInRouteImport.update({
@@ -153,6 +148,12 @@ const AuthenticatedPromotionAdvertisingRoute =
     id: '/promotion/advertising',
     path: '/promotion/advertising',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPersonalCenterSecurityRoute =
+  AuthenticatedPersonalCenterSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => AuthenticatedPersonalCenterRouteRoute,
   } as any)
 const AuthenticatedOperationPointRoute =
   AuthenticatedOperationPointRouteImport.update({
@@ -231,7 +232,6 @@ export interface FileRoutesByFullPath {
   '/personal-center': typeof AuthenticatedPersonalCenterRouteRouteWithChildren
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
-  '/sign-up': typeof authSignUpRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -248,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/content/tag': typeof AuthenticatedContentTagRoute
   '/operation/comment': typeof AuthenticatedOperationCommentRoute
   '/operation/point': typeof AuthenticatedOperationPointRoute
+  '/personal-center/security': typeof AuthenticatedPersonalCenterSecurityRoute
   '/promotion/advertising': typeof AuthenticatedPromotionAdvertisingRoute
   '/promotion/scene': typeof AuthenticatedPromotionSceneRoute
   '/system/admin': typeof AuthenticatedSystemAdminRoute
@@ -264,7 +265,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
-  '/sign-up': typeof authSignUpRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -281,6 +281,7 @@ export interface FileRoutesByTo {
   '/content/tag': typeof AuthenticatedContentTagRoute
   '/operation/comment': typeof AuthenticatedOperationCommentRoute
   '/operation/point': typeof AuthenticatedOperationPointRoute
+  '/personal-center/security': typeof AuthenticatedPersonalCenterSecurityRoute
   '/promotion/advertising': typeof AuthenticatedPromotionAdvertisingRoute
   '/promotion/scene': typeof AuthenticatedPromotionSceneRoute
   '/system/admin': typeof AuthenticatedSystemAdminRoute
@@ -300,7 +301,6 @@ export interface FileRoutesById {
   '/_authenticated/personal-center': typeof AuthenticatedPersonalCenterRouteRouteWithChildren
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
-  '/(auth)/sign-up': typeof authSignUpRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
   '/(errors)/404': typeof errors404Route
@@ -317,6 +317,7 @@ export interface FileRoutesById {
   '/_authenticated/content/tag': typeof AuthenticatedContentTagRoute
   '/_authenticated/operation/comment': typeof AuthenticatedOperationCommentRoute
   '/_authenticated/operation/point': typeof AuthenticatedOperationPointRoute
+  '/_authenticated/personal-center/security': typeof AuthenticatedPersonalCenterSecurityRoute
   '/_authenticated/promotion/advertising': typeof AuthenticatedPromotionAdvertisingRoute
   '/_authenticated/promotion/scene': typeof AuthenticatedPromotionSceneRoute
   '/_authenticated/system/admin': typeof AuthenticatedSystemAdminRoute
@@ -336,7 +337,6 @@ export interface FileRouteTypes {
     | '/personal-center'
     | '/otp'
     | '/sign-in'
-    | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
@@ -353,6 +353,7 @@ export interface FileRouteTypes {
     | '/content/tag'
     | '/operation/comment'
     | '/operation/point'
+    | '/personal-center/security'
     | '/promotion/advertising'
     | '/promotion/scene'
     | '/system/admin'
@@ -369,7 +370,6 @@ export interface FileRouteTypes {
     | '/'
     | '/otp'
     | '/sign-in'
-    | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
@@ -386,6 +386,7 @@ export interface FileRouteTypes {
     | '/content/tag'
     | '/operation/comment'
     | '/operation/point'
+    | '/personal-center/security'
     | '/promotion/advertising'
     | '/promotion/scene'
     | '/system/admin'
@@ -404,7 +405,6 @@ export interface FileRouteTypes {
     | '/_authenticated/personal-center'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
-    | '/(auth)/sign-up'
     | '/(errors)/401'
     | '/(errors)/403'
     | '/(errors)/404'
@@ -421,6 +421,7 @@ export interface FileRouteTypes {
     | '/_authenticated/content/tag'
     | '/_authenticated/operation/comment'
     | '/_authenticated/operation/point'
+    | '/_authenticated/personal-center/security'
     | '/_authenticated/promotion/advertising'
     | '/_authenticated/promotion/scene'
     | '/_authenticated/system/admin'
@@ -439,7 +440,6 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
-  authSignUpRoute: typeof authSignUpRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -503,13 +503,6 @@ declare module '@tanstack/react-router' {
       path: '/401'
       fullPath: '/401'
       preLoaderRoute: typeof errors401RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(auth)/sign-up': {
-      id: '/(auth)/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof authSignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/sign-in': {
@@ -595,6 +588,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/promotion/advertising'
       preLoaderRoute: typeof AuthenticatedPromotionAdvertisingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/personal-center/security': {
+      id: '/_authenticated/personal-center/security'
+      path: '/security'
+      fullPath: '/personal-center/security'
+      preLoaderRoute: typeof AuthenticatedPersonalCenterSecurityRouteImport
+      parentRoute: typeof AuthenticatedPersonalCenterRouteRoute
     }
     '/_authenticated/operation/point': {
       id: '/_authenticated/operation/point'
@@ -684,11 +684,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedPersonalCenterRouteRouteChildren {
+  AuthenticatedPersonalCenterSecurityRoute: typeof AuthenticatedPersonalCenterSecurityRoute
   AuthenticatedPersonalCenterIndexRoute: typeof AuthenticatedPersonalCenterIndexRoute
 }
 
 const AuthenticatedPersonalCenterRouteRouteChildren: AuthenticatedPersonalCenterRouteRouteChildren =
   {
+    AuthenticatedPersonalCenterSecurityRoute:
+      AuthenticatedPersonalCenterSecurityRoute,
     AuthenticatedPersonalCenterIndexRoute:
       AuthenticatedPersonalCenterIndexRoute,
   }
@@ -772,7 +775,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
-  authSignUpRoute: authSignUpRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,

@@ -2,7 +2,37 @@
   "title": "个人中心",
   "description": "查看与修改您的个人信息与账号安全设置",
   "sidebar": {
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "security": "安全"
+  },
+  "security": {
+    "title": "账号安全",
+    "desc": "管理二次校验绑定，保护账户不被密码泄露影响",
+    "totpTitle": "二次校验（TOTP）",
+    "totpEnabledDesc": "已启用。剩余备份码 {{count}} 个。登录时需要在验证器中输入 6 位验证码。",
+    "totpDisabledDesc": "未启用。建议绑定 Google / Microsoft Authenticator / 1Password 等验证器，防止密码泄露后账户被登录。",
+    "statusEnabled": "已启用",
+    "statusDisabled": "未启用",
+    "bindButton": "开始绑定",
+    "unbindButton": "解绑",
+    "bindTitle": "绑定二次校验",
+    "bindDescription": "用 Google / Microsoft Authenticator / 1Password 等任意验证器扫描二维码，然后输入应用显示的 6 位验证码完成绑定。",
+    "unbindTitle": "解绑二次校验",
+    "unbindDescription": "请输入当前验证器中的 6 位验证码以确认解绑。解绑后下次登录将不再要求二次校验。",
+    "manualSecret": "或手动输入此密钥",
+    "recoveryWarningTitle": "请立即保存备份码",
+    "recoveryWarningBody": "下列 10 个备份码各可使用一次，用于在验证器丢失时登录。本对话框关闭后将无法再次查看，请截图或复制到密码管理器。",
+    "copyAll": "复制所有备份码",
+    "confirmCodeLabel": "请输入验证器中的 6 位验证码",
+    "cancel": "取消",
+    "confirmBind": "确认绑定",
+    "confirmUnbind": "确认解绑",
+    "bindSuccess": "二次校验已启用",
+    "bindFailed": "绑定失败",
+    "unbindSuccess": "已解绑二次校验",
+    "unbindFailed": "解绑失败",
+    "copied": "已复制",
+    "copyFailed": "复制失败"
   },
   "profile": {
     "title": "个人资料",
