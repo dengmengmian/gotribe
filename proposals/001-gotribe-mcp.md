@@ -107,8 +107,7 @@ gotribe-mcp/
 |---|---|---|
 | `GOTRIBE_API_BASE_URL` | ✓ | 后端地址,如 `https://cms.gotribe.cn` |
 | `GOTRIBE_API_PREFIX` | | 路由前缀,默认 `/api`(对应 `admin.url_path_prefix`) |
-| `GOTRIBE_ACCESS_TOKEN` | ✓ | 已登录拿到的 access_token |
-| `GOTRIBE_REFRESH_TOKEN` | | refresh_token(有则自动刷新,无则 401 时直接报错) |
+| `GOTRIBE_ACCESS_TOKEN` | ✓ | 已登录拿到的 access_token。**M2 实施时发现:gotribecms refresh 流程是"用过期 access_token 调 refresh 接口"换新 token,不需要独立 refresh_token,因此移除原计划的 `GOTRIBE_REFRESH_TOKEN` env** |
 | `GOTRIBE_DEFAULT_PROJECT_ID` | ✓ | 创建文章必带 |
 | `GOTRIBE_DEFAULT_USER_ID` | ✓ | 创建文章必带 |
 | `GOTRIBE_DEFAULT_AUTHOR` | ✓ | 创建文章必带 |
@@ -175,10 +174,10 @@ gotribe-mcp/
 | 阶段 | 谁来做 |
 |---|---|
 | 首次登录(含 TOTP) | 用户在 gotribecms 前端手动登录一次 |
-| 拷贝 token | 用户从浏览器开发者工具拷贝 `access_token` + `refresh_token` |
-| 配置到 MCP | 写到 env 变量 |
-| 后续 refresh | **MCP 自动**:401 时拿 `refresh_token` 调 `POST /api/base/refreshToken` |
-| refresh 也过期 | MCP 报错"请重新登录获取 token",用户重走上述流程 |
+| 拷贝 token | 用户从浏览器开发者工具拷贝 `access_token`(**只需要这一个**,gotribecms refresh 接口不消费独立 refresh_token) |
+| 配置到 MCP | 写到 `GOTRIBE_ACCESS_TOKEN` env |
+| 后续 refresh | **MCP 自动**:401 时把当前(过期的)access_token 放 Authorization Bearer 调 `POST /api/base/refreshToken`(后端用 `VerifyAccessTokenWithoutExpiry` 校验签名),拿到新 access_token,重试原请求一次 |
+| refresh 也失败 | MCP 报错"请重新登录获取 token",用户重走上述流程,**不静默** |
 
 **Token 持久化**:
 - MCP 进程内存中保存最新的 access_token(refresh 后会更新)
