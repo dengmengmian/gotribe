@@ -6,6 +6,6 @@ package handler
 import "github.com/gin-gonic/gin"
 
 // RegisterRoutes 注册当前模块对外暴露的路由。
-func (h *Handler) RegisterRoutes(secured *gin.RouterGroup, eventLimiter gin.HandlerFunc) {
-	secured.POST("/user-events", eventLimiter, h.Create)
+func (h *Handler) RegisterRoutes(public *gin.RouterGroup, eventLimiter gin.HandlerFunc) {
+	public.POST("/user-events", eventLimiter, h.Create)
 }

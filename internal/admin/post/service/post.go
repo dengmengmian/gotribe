@@ -10,6 +10,7 @@ import (
 	"gotribe/internal/admin/post/dto"
 	postRepository "gotribe/internal/admin/post/repository"
 	projectRepo "gotribe/internal/admin/project/repository"
+	"gotribe/internal/core/cache"
 	"gotribe/internal/core/constant"
 	"gotribe/internal/core/database"
 	"gotribe/internal/core/errs"
@@ -33,15 +34,17 @@ type postService struct {
 	projectRepo *projectRepo.Repository
 	log         *zap.SugaredLogger
 	tx          *database.TransactionManager
+	cache       *cache.Store
 }
 
 // NewService 创建内容服务实例
-func NewService(tx *database.TransactionManager, log *zap.SugaredLogger) Service {
+func NewService(tx *database.TransactionManager, log *zap.SugaredLogger, store *cache.Store) Service {
 	return &postService{
 		postRepo:    postRepository.NewRepository(tx),
 		projectRepo: projectRepo.NewRepository(tx),
 		log:         log,
 		tx:          tx,
+		cache:       store,
 	}
 }
 
@@ -53,6 +56,16 @@ func (s *postService) Detail(ctx context.Context, id int64) (model.Post, error) 
 // List 获取内容列表
 func (s *postService) List(ctx context.Context, req *dto.PostListRequest) ([]*model.Post, int64, error) {
 	return s.postRepo.List(ctx, req)
+}
+
+// clearPostListCache 清除文章列表缓存（best effort）。
+func (s *postService) clearPostListCache(ctx context.Context) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.DeleteByPattern(ctx, s.cache.PostListPattern()); err != nil {
+		s.log.Warnf("清除文章列表缓存失败: %v", err)
+	}
 }
 
 // Create 创建内容
@@ -98,7 +111,7 @@ func (s *postService) Create(ctx context.Context, req *dto.CreatePostRequest) er
 		ShowTime:    showTime,
 		Video:       req.Video,
 	}
-	return s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err = s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.postRepo.Create(txCtx, &post); err != nil {
 			if postRepository.IsInvalidTagIDError(err) {
 				return errs.BadRequest(err.Error(), err)
@@ -107,6 +120,10 @@ func (s *postService) Create(ctx context.Context, req *dto.CreatePostRequest) er
 		}
 		return nil
 	})
+	if err == nil {
+		s.clearPostListCache(ctx)
+	}
+	return err
 }
 
 // Update 更新内容
@@ -153,7 +170,7 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 	oldPost.Images = imageStr
 	oldPost.Video = req.Video
 	oldPost.ShowTime = showTime
-	return s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err = s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.postRepo.Update(txCtx, &oldPost); err != nil {
 			if postRepository.IsInvalidTagIDError(err) {
 				return errs.BadRequest(err.Error(), err)
@@ -162,6 +179,10 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 		}
 		return nil
 	})
+	if err == nil {
+		s.clearPostListCache(ctx)
+	}
+	return err
 }
 
 // Delete 批量删除内容
@@ -169,9 +190,13 @@ func (s *postService) Delete(ctx context.Context, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	return s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		return s.postRepo.Delete(txCtx, ids)
 	})
+	if err == nil {
+		s.clearPostListCache(ctx)
+	}
+	return err
 }
 
 // Publish 发布内容
@@ -187,6 +212,7 @@ func (s *postService) Publish(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
+	s.clearPostListCache(ctx)
 	projectInfo, err := s.projectRepo.GetProjectByID(ctx, oldPost.ProjectID)
 	if err != nil {
 		s.log.Errorf("获取项目信息失败: %v", err)

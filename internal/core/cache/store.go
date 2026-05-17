@@ -34,6 +34,16 @@ func (s *Store) PostDetailKey(projectID, postID string) string {
 	return s.keys.PostDetailKey(projectID, postID)
 }
 
+// PostListKey 返回文章列表缓存键。
+func (s *Store) PostListKey(projectID, filter string) string {
+	return s.keys.PostListKey(projectID, filter)
+}
+
+// PostListPattern 返回文章列表缓存键的匹配模式，用于批量删除。
+func (s *Store) PostListPattern() string {
+	return s.keys.PostListPattern()
+}
+
 // Keys 返回底层键构建器，供特殊场景复用。
 func (s *Store) Keys() *KeyBuilder {
 	return s.keys
@@ -69,4 +79,28 @@ func (s *Store) Delete(ctx context.Context, keys ...string) error {
 		return nil
 	}
 	return s.client.Del(ctx, keys...).Err()
+}
+
+// DeleteByPattern 使用 SCAN 按 pattern 批量删除缓存键，避免 KEYS 命令阻塞 Redis。
+func (s *Store) DeleteByPattern(ctx context.Context, pattern string) error {
+	if s.client == nil {
+		return nil
+	}
+	var cursor uint64
+	for {
+		keys, nextCursor, err := s.client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := s.client.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+	return nil
 }

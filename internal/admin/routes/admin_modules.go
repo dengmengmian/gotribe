@@ -84,6 +84,15 @@ type AdminModules struct {
 	Job          *jobhandler.Handler
 }
 
+// newPostCacheStore 从 redis.UniversalClient 创建 post 模块专用的缓存存储。
+// 若 redisClient 不是 *redis.Client（如集群模式），返回 nil，post 服务将回退到无缓存。
+func newPostCacheStore(redisClient redis.UniversalClient, keys *cache.KeyBuilder) *cache.Store {
+	if rc, ok := redisClient.(*redis.Client); ok {
+		return cache.NewStore(rc, keys)
+	}
+	return nil
+}
+
 // BuildAdminModules 装配全部 Admin 业务模块。
 func BuildAdminModules(
 	tx *database.TransactionManager,
@@ -115,7 +124,7 @@ func BuildAdminModules(
 		Config:       confighandler.NewHandler(configservice.NewService(tx)),
 		Tag:          taghandler.NewHandler(tagservice.NewService(tx)),
 		Category:     categoryhandler.NewHandler(categoryservice.NewService(tx, log)),
-		Post:         posthandler.NewHandler(postservice.NewService(tx, log)),
+		Post:         posthandler.NewHandler(postservice.NewService(tx, log, newPostCacheStore(redisClient, keys))),
 		User:         userhandler.NewHandler(userservice.NewService(tx), cdnDomain),
 		Resource:     resourcehandler.NewHandler(resourceservice.NewService(tx, uploadCfg, log), cdnDomain),
 		Column:       columnhandler.NewHandler(columnservice.NewService(tx)),

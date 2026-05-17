@@ -4,7 +4,6 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
-	"gotribe/internal/core/errs"
 	"gotribe/internal/core/middleware"
 	"gotribe/internal/request"
 	"gotribe/internal/core/response"
@@ -24,10 +23,9 @@ func NewHandler(service *usereventservice.Service) *Handler {
 
 // Create 处理用户行为事件上报请求。
 func (h *Handler) Create(c *gin.Context) {
-	userID, ok := middleware.GetUserID(c)
-	if !ok {
-		response.Error(c, errs.Unauthorized("missing user context"))
-		return
+	var userID int64
+	if uid, ok := middleware.GetUserID(c); ok {
+		userID = int64(uid)
 	}
 
 	var req usereventdto.CreateRequest
@@ -39,7 +37,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if err := h.service.Create(
 		c.Request.Context(),
 		middleware.GetProjectID(c),
-			int64(userID),
+		userID,
 		req,
 		c.ClientIP(),
 		c.Request.UserAgent(),

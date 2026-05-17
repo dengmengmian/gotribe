@@ -24,6 +24,12 @@ import (
 	"gotribe/internal/model"
 )
 
+// listCacheEntry 用于文章列表缓存的序列化结构。
+type listCacheEntry struct {
+	Items []postdto.PostResponse `json:"items"`
+	Meta  database.Pagination    `json:"meta"`
+}
+
 var htmlTagPattern = regexp.MustCompile(`<[^>]+>`)
 
 // Service 负责封装文章相关的业务逻辑。
@@ -46,8 +52,14 @@ func NewService(repo *postrepo.Repository, tags *tagrepo.Repository, categories 
 	}
 }
 
-// List 查询文章列表并附带标签和分页信息。
+// List 查询文章列表并附带标签和分页信息，结果按查询条件缓存 3 分钟。
 func (s *Service) List(ctx context.Context, projectID string, query postdto.ListQuery) ([]postdto.PostResponse, database.Pagination, error) {
+	cacheKey := s.cache.PostListKey(projectID, listCacheFilter(query))
+	var cached listCacheEntry
+	if ok, err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil && ok {
+		return cached.Items, cached.Meta, nil
+	}
+
 	var tagIDs []int64
 	var err error
 	if tag := strings.TrimSpace(query.Tag); tag != "" {
@@ -92,7 +104,10 @@ func (s *Service) List(ctx context.Context, projectID string, query postdto.List
 	for _, item := range posts {
 		items = append(items, toPostResponse(item, tagsByPostID[item.ID], categoriesByID[item.CategoryID], false))
 	}
-	return items, database.Pagination{Page: page, PerPage: perPage, Total: total}, nil
+
+	meta := database.Pagination{Page: page, PerPage: perPage, Total: total}
+	_ = s.cache.SetJSON(ctx, cacheKey, listCacheEntry{Items: items, Meta: meta}, time.Duration(s.cacheTTL)*time.Minute)
+	return items, meta, nil
 }
 
 // Detail 查询文章详情，并在需要时校验访问密码。
@@ -146,6 +161,24 @@ func (s *Service) GetSummaries(ctx context.Context, projectID string, postIDs []
 		}
 	}
 	return result, nil
+}
+
+// listCacheFilter 把查询参数序列化为缓存 filter 字符串。
+// 分页参数先经过 NormalizePagination 规范化，确保默认请求和显式传 page=1&per_page=10 共享同一缓存 key。
+func listCacheFilter(query postdto.ListQuery) string {
+	page, perPage := database.NormalizePagination(query.Page, query.PerPage)
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "p%d|pp%d|k%s|t%s|dt%s", page, perPage, query.Keyword, query.Tag, query.DynamicType)
+	if query.Status != nil {
+		fmt.Fprintf(&sb, "|s%d", *query.Status)
+	}
+	if query.Type != nil {
+		fmt.Fprintf(&sb, "|ty%d", *query.Type)
+	}
+	if query.CategoryID != nil {
+		fmt.Fprintf(&sb, "|c%d", *query.CategoryID)
+	}
+	return sb.String()
 }
 
 // loadTagsByPostID 按文章集合批量加载标签关系。

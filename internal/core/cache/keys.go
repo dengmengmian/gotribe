@@ -75,6 +75,16 @@ func (b *KeyBuilder) PostDetailKey(projectID, postID string) string {
 	return fmt.Sprintf("%s:post:detail:%s:%s", b.prefix, strings.TrimSpace(projectID), strings.TrimSpace(postID))
 }
 
+// PostListKey 返回文章列表缓存键。
+func (b *KeyBuilder) PostListKey(projectID, filter string) string {
+	return fmt.Sprintf("%s:post:list:%s:%s", b.prefix, strings.TrimSpace(projectID), hash(filter))
+}
+
+// PostListPattern 返回文章列表缓存键的匹配模式，用于批量删除。
+func (b *KeyBuilder) PostListPattern() string {
+	return fmt.Sprintf("%s:post:list:*", b.prefix)
+}
+
 // AdminLoginFailAccountKey 返回 admin 账户维度登录失败计数键。
 // 使用 hash 隐藏明文用户名，避免 Redis 中泄露用户名枚举。
 func (b *KeyBuilder) AdminLoginFailAccountKey(username string) string {

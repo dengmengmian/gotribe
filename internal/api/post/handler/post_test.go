@@ -19,6 +19,7 @@ import (
 	postrepo "gotribe/internal/api/post/repository"
 	postservice "gotribe/internal/api/post/service"
 	tagrepo "gotribe/internal/api/tag/repository"
+	categoryrepo "gotribe/internal/api/category/repository"
 )
 
 func TestHandler_Detail(t *testing.T) {
@@ -46,7 +47,7 @@ func TestHandler_Detail(t *testing.T) {
 	tx := database.NewTransactionManager(db)
 	keys := cache.NewKeyBuilder("gotribe-test")
 	store := cache.NewStore(redisClient, keys)
-	handler := NewHandler(postservice.NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), store, 5))
+	handler := NewHandler(postservice.NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), categoryrepo.NewRepository(tx), store, 5))
 
 	engine := gin.New()
 	engine.Use(middleware.ProjectID("1"))

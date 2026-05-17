@@ -94,7 +94,7 @@ func NewRouter(cfg config.Config, providers *Providers) (*gin.Engine, error) {
 	providers.Modules.Tag.Handler.RegisterRoutes(public)
 	providers.Modules.Category.Handler.RegisterRoutes(public)
 	providers.Modules.Example.Handler.RegisterRoutes(currentUser, apiLimiter)
-	providers.Modules.UserEvent.Handler.RegisterRoutes(secured, eventLimiter)
+	providers.Modules.UserEvent.Handler.RegisterRoutes(public, eventLimiter)
 
 	return router, nil
 }

@@ -13,6 +13,7 @@ import (
 	postdto "gotribe/internal/api/post/dto"
 	postrepo "gotribe/internal/api/post/repository"
 	tagrepo "gotribe/internal/api/tag/repository"
+	categoryrepo "gotribe/internal/api/category/repository"
 	"gotribe/internal/core/cache"
 	"gotribe/internal/core/database"
 	postmodel "gotribe/internal/model"
@@ -31,7 +32,7 @@ func TestService_DetailRejectsWrongPassword(t *testing.T) {
 	tx := database.NewTransactionManager(db)
 	keys := cache.NewKeyBuilder("gotribe-test")
 	store := cache.NewStore(redisClient, keys)
-	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), store, 5)
+	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), categoryrepo.NewRepository(tx), store, 5)
 
 	post := postmodel.Post{
 		Slug:      "slug-protected",
@@ -61,7 +62,7 @@ func TestService_DetailCachesPublicPost(t *testing.T) {
 	tx := database.NewTransactionManager(db)
 	keys := cache.NewKeyBuilder("gotribe-test")
 	store := cache.NewStore(redisClient, keys)
-	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), store, 5)
+	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), categoryrepo.NewRepository(tx), store, 5)
 
 	post := postmodel.Post{
 		Slug:      "slug-public",
@@ -94,7 +95,7 @@ func TestService_ListReturnsWordCountWithoutBody(t *testing.T) {
 	tx := database.NewTransactionManager(db)
 	keys := cache.NewKeyBuilder("gotribe-test")
 	store := cache.NewStore(redisClient, keys)
-	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), store, 5)
+	service := NewService(postrepo.NewRepository(tx), tagrepo.NewRepository(tx), categoryrepo.NewRepository(tx), store, 5)
 
 	post := postmodel.Post{
 		Slug:        "slug-list",
