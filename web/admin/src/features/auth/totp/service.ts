@@ -51,3 +51,16 @@ export function deleteTOTP(code: string) {
 export function adminResetTOTP(adminId: number) {
   return request.post<null>(`/api/base/admin/${adminId}/totp/reset`)
 }
+
+/** 登录中途首次绑定（强制模式下），用 step_token 拿到 secret/QR/备份码 */
+export function enrollPendingTOTP(stepToken: string) {
+  return request.post<TOTPBindResult>('/api/base/totp/enroll', { step_token: stepToken })
+}
+
+/** 用同一 step_token + 6 位码完成首次绑定并拿到 access_token */
+export function confirmEnrollPendingTOTP(stepToken: string, code: string) {
+  return request.post<TOTPVerifyResult>('/api/base/totp/enroll/confirm', {
+    step_token: stepToken,
+    code,
+  })
+}

@@ -26,7 +26,7 @@ interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
   redirectTo?: string
 }
 
-const AUTH_ROUTES = ['/sign-in', '/otp']
+const AUTH_ROUTES = ['/sign-in', '/otp', '/totp-setup']
 const DEFAULT_SIGN_IN_REDIRECT = '/dashboard'
 
 function resolveSignInRedirect(redirectTo?: string): string {
@@ -122,11 +122,19 @@ export function UserAuthForm({
           if (!result.step_token) {
             throw new Error(t('features.auth.signIn.error'))
           }
-          // 保存 step_token 到 sessionStorage，由 /otp 页消费
           sessionStorage.setItem('totp_step_token', result.step_token)
           sessionStorage.setItem('totp_step_redirect', redirectTo ?? '')
           navigate({ to: '/otp', replace: true })
           return t('features.auth.signIn.totpRequired')
+        }
+        if (result.stage === 'bind_required') {
+          if (!result.step_token) {
+            throw new Error(t('features.auth.signIn.error'))
+          }
+          sessionStorage.setItem('totp_bind_step_token', result.step_token)
+          sessionStorage.setItem('totp_bind_redirect', redirectTo ?? '')
+          navigate({ to: '/totp-setup', replace: true })
+          return t('features.auth.signIn.bindRequired')
         }
         if (!result.token) {
           throw new Error(t('features.auth.signIn.error'))

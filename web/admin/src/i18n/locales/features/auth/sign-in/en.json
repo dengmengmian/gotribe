@@ -11,6 +11,7 @@
   "securityHint": "Make sure you are using a trusted device and network before continuing.",
   "welcomeBack": "Welcome back, {{username}}!",
   "totpRequired": "Enter the 6-digit code from your authenticator",
+  "bindRequired": "TOTP setup required before sign-in",
   "error": "Error",
   "footerText": "By clicking sign in, you agree to our",
   "termsOfService": "Terms of Service",

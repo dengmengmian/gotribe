@@ -1,0 +1,16 @@
+{
+  "title": "绑定二次校验",
+  "description": "管理员策略要求绑定 TOTP 后才能登录。用 Google / Microsoft Authenticator / 1Password 等任意验证器扫描下方二维码，输入应用显示的 6 位验证码完成绑定。",
+  "manualSecret": "或手动输入此密钥",
+  "recoveryWarningTitle": "请立即保存备份码",
+  "recoveryWarningBody": "下列 10 个备份码各可使用一次，用于在验证器丢失时登录。本页面关闭后将无法再次查看。",
+  "copyAll": "复制所有备份码",
+  "copied": "已复制",
+  "copyFailed": "复制失败",
+  "confirmCodeLabel": "请输入验证器中的 6 位验证码",
+  "confirmAndContinue": "确认并继续登录",
+  "enrollFailed": "发起绑定失败",
+  "confirmFailed": "绑定确认失败",
+  "footerText": "想换个账号？",
+  "backLink": "返回登录"
+}

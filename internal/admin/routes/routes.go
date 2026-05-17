@@ -199,6 +199,8 @@ func registerAPIRoutes(engine *gin.Engine, infra *Infra, cfg coreconfig.Config, 
 	apiGroup.POST("/base/logout", m.Auth.Logout)
 	apiGroup.POST("/base/refreshToken", m.Auth.RefreshToken)
 	apiGroup.POST("/base/totp/verify", m.Auth.VerifyTOTP)
+	apiGroup.POST("/base/totp/enroll", m.Auth.EnrollTOTP)
+	apiGroup.POST("/base/totp/enroll/confirm", m.Auth.ConfirmEnrollTOTP)
 	apiGroup.GET("/base/config", m.SystemConfig.Detail)
 
 	protected := apiGroup.Group("")

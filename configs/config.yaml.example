@@ -279,3 +279,6 @@ admin:
     digits: 6
     # 允许 ±N 步时钟漂移，1 表示 ±30s
     skew: 1
+    # 是否强制全部 admin 绑定 TOTP：true 时未绑用户登录后必须先完成绑定才能拿到 access_token；
+    # false（默认）时只在登录响应中带 mfa_reminder=true，由用户自行决定。
+    required: false

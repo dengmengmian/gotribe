@@ -29,6 +29,9 @@ const (
 	LoginStageOK LoginStage = "ok"
 	// LoginStageTOTPRequired 表示需要进行 TOTP 二次校验，StepToken 字段为短期凭证。
 	LoginStageTOTPRequired LoginStage = "totp_required"
+	// LoginStageBindRequired 表示策略要求强制绑定 TOTP（admin.totp.required=true 且账户未绑定），
+	// 调用方需用 StepToken 走 /totp/enroll → /totp/enroll/confirm 完成首次绑定与登录。
+	LoginStageBindRequired LoginStage = "bind_required"
 )
 
 // LoginResult 登录/刷新响应数据。字段按 Stage 取值不同而填充：
@@ -52,10 +55,12 @@ type service struct {
 	lockout      *LockoutTracker
 	totpService  TOTPService
 	stepTokenTTL time.Duration
+	totpRequired bool
 }
 
 // NewService 创建认证服务实例。audience 通常传 core.AudienceAdmin。
 // lockout 与 totpService 可为 nil（用于过渡期或单测），但建议生产环境注入。
+// totpRequired=true 时，未绑 TOTP 的 admin 登录将返回 stage=bind_required 强制绑定。
 func NewService(
 	audience string,
 	tx *database.TransactionManager,
@@ -63,6 +68,7 @@ func NewService(
 	lockout *LockoutTracker,
 	totpService TOTPService,
 	stepTokenTTL time.Duration,
+	totpRequired bool,
 ) Service {
 	return &service{
 		audience:     audience,
@@ -71,6 +77,7 @@ func NewService(
 		lockout:      lockout,
 		totpService:  totpService,
 		stepTokenTTL: stepTokenTTL,
+		totpRequired: totpRequired,
 	}
 }
 
@@ -120,6 +127,18 @@ func (s *service) Login(ctx context.Context, username, password, clientIP string
 			}
 			return &LoginResult{
 				Stage:       LoginStageTOTPRequired,
+				StepToken:   token,
+				StepExpires: expires,
+			}, nil
+		}
+		// 未绑定 + 策略强制 → 走「登录中途首次绑定」流程
+		if s.totpRequired {
+			token, _, expires, err := s.manager.SignStepToken(user.ID, user.Username, core.StepTokenPurposeTOTPBind, s.stepTokenTTL)
+			if err != nil {
+				return nil, errs.Internal("生成 step token 失败", err)
+			}
+			return &LoginResult{
+				Stage:       LoginStageBindRequired,
 				StepToken:   token,
 				StepExpires: expires,
 			}, nil

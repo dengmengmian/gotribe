@@ -17,6 +17,7 @@ import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
+import { Route as authTotpSetupRouteImport } from './routes/(auth)/totp-setup'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authOtpRouteImport } from './routes/(auth)/otp'
 import { Route as AuthenticatedPersonalCenterRouteRouteImport } from './routes/_authenticated/personal-center/route'
@@ -80,6 +81,11 @@ const errors403Route = errors403RouteImport.update({
 const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authTotpSetupRoute = authTotpSetupRouteImport.update({
+  id: '/(auth)/totp-setup',
+  path: '/totp-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authSignInRoute = authSignInRouteImport.update({
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/personal-center': typeof AuthenticatedPersonalCenterRouteRouteWithChildren
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/totp-setup': typeof authTotpSetupRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/totp-setup': typeof authTotpSetupRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/_authenticated/personal-center': typeof AuthenticatedPersonalCenterRouteRouteWithChildren
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
+  '/(auth)/totp-setup': typeof authTotpSetupRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
   '/(errors)/404': typeof errors404Route
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
     | '/personal-center'
     | '/otp'
     | '/sign-in'
+    | '/totp-setup'
     | '/401'
     | '/403'
     | '/404'
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/'
     | '/otp'
     | '/sign-in'
+    | '/totp-setup'
     | '/401'
     | '/403'
     | '/404'
@@ -405,6 +416,7 @@ export interface FileRouteTypes {
     | '/_authenticated/personal-center'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
+    | '/(auth)/totp-setup'
     | '/(errors)/401'
     | '/(errors)/403'
     | '/(errors)/404'
@@ -440,6 +452,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
+  authTotpSetupRoute: typeof authTotpSetupRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -503,6 +516,13 @@ declare module '@tanstack/react-router' {
       path: '/401'
       fullPath: '/401'
       preLoaderRoute: typeof errors401RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/totp-setup': {
+      id: '/(auth)/totp-setup'
+      path: '/totp-setup'
+      fullPath: '/totp-setup'
+      preLoaderRoute: typeof authTotpSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/sign-in': {
@@ -775,6 +795,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
+  authTotpSetupRoute: authTotpSetupRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,

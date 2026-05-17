@@ -18,6 +18,10 @@ import (
 // StepTokenPurposeTOTPVerify 是 TOTP 二次校验场景的 purpose 标记。
 const StepTokenPurposeTOTPVerify = "totp_verify"
 
+// StepTokenPurposeTOTPBind 是「登录中途首次绑定 TOTP」场景的 purpose 标记。
+// 仅在 admin.totp.required=true 且账户尚未绑定时签发。
+const StepTokenPurposeTOTPBind = "totp_bind"
+
 // stepTokenAudience 是 step_token 专属 audience，与登录 token 的 audience 隔离。
 const stepTokenAudience = "gotribe.admin.step"
 

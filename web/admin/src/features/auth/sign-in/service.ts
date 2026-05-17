@@ -5,7 +5,7 @@ export interface LoginParams {
   password: string
 }
 
-export type LoginStage = 'ok' | 'totp_required'
+export type LoginStage = 'ok' | 'totp_required' | 'bind_required'
 
 /** 登录响应：根据 stage 字段不同填充不同字段。 */
 export interface LoginResult {

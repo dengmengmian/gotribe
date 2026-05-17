@@ -14,7 +14,7 @@ import { getCurrentUser } from '@/service/user'
  * 需要排除的认证相关路由
  * 这些路由不需要认证即可访问
  */
-const AUTH_ROUTES = ['/sign-in', '/otp']
+const AUTH_ROUTES = ['/sign-in', '/otp', '/totp-setup']
 
 /**
  * 根路由配置

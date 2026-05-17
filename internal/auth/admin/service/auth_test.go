@@ -66,7 +66,7 @@ func TestNewService(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	tx := database.NewTransactionManager(db)
-	svc := NewService(core.AudienceAdmin, tx, newTestManager(t), nil, nil, 5*time.Minute)
+	svc := NewService(core.AudienceAdmin, tx, newTestManager(t), nil, nil, 5*time.Minute, false)
 	require.NotNil(t, svc)
 }
 
@@ -75,7 +75,7 @@ func TestAuthService_Login(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute, false)
 	ctx := context.Background()
 
 	t.Run("登录成功", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestAuthService_Refresh(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute, false)
 	ctx := context.Background()
 
 	t.Run("刷新成功", func(t *testing.T) {

@@ -102,7 +102,7 @@ func BuildAdminModules(
 	if err != nil {
 		log.Fatalf("TOTP 服务初始化失败: %v", err)
 	}
-	authSvc := authservice.NewService(core.AudienceAdmin, tx, authManager, lockout, totpSvc, adminCfg.TOTP.StepTokenTTL())
+	authSvc := authservice.NewService(core.AudienceAdmin, tx, authManager, lockout, totpSvc, adminCfg.TOTP.StepTokenTTL(), adminCfg.TOTP.Required)
 	return &AdminModules{
 		Auth:         authhandler.NewHandler(core.AudienceAdmin, authSvc, authManager, totpSvc),
 		AI:           aihandler.NewHandler(aiservice.NewService(aiCfg)),

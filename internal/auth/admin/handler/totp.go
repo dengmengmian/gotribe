@@ -34,6 +34,17 @@ type TOTPDeleteRequest struct {
 	Code string `json:"code" binding:"required"`
 }
 
+// TOTPEnrollRequest 登录中途首次绑定的请求体（仅 step_token）。
+type TOTPEnrollRequest struct {
+	StepToken string `json:"step_token" binding:"required"`
+}
+
+// TOTPEnrollConfirmRequest 登录中途首次绑定的确认请求体。
+type TOTPEnrollConfirmRequest struct {
+	StepToken string `json:"step_token" binding:"required"`
+	Code      string `json:"code" binding:"required"`
+}
+
 // VerifyTOTP 登录后两步校验，通过后签发 access_token。
 // @Summary  TOTP 二次校验
 // @Tags     认证管理
@@ -174,6 +185,62 @@ func (h *Handler) DeleteTOTP(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// EnrollTOTP 登录后台强制绑定首步：用 step_token(purpose=totp_bind) 换取 secret/QR/备份码。
+// @Summary  登录中途首次绑定 TOTP（公开，凭 step_token）
+// @Tags     认证管理
+// @Accept   json
+// @Produce  json
+// @Param    request body TOTPEnrollRequest true "step_token"
+// @Success  200 {object} response.Response{data=authservice.TOTPBindResult}
+// @Router   /base/totp/enroll [post]
+func (h *Handler) EnrollTOTP(c *gin.Context) {
+	if h.totpService == nil {
+		response.Error(c, errs.Internal("TOTP 服务未启用", nil))
+		return
+	}
+	var req TOTPEnrollRequest
+	if err := request.BindJSON(c, &req); err != nil {
+		response.Error(c, err)
+		return
+	}
+	result, err := h.totpService.EnrollPending(c.Request.Context(), req.StepToken)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, result)
+}
+
+// ConfirmEnrollTOTP 登录中途首次绑定的最终确认：用同一 step_token + 6 位码激活并签发 access_token。
+// @Summary  确认登录中途绑定并签发 access_token
+// @Tags     认证管理
+// @Accept   json
+// @Produce  json
+// @Param    request body TOTPEnrollConfirmRequest true "step_token + code"
+// @Success  200 {object} response.Response{data=object{token=string,expires=string}}
+// @Router   /base/totp/enroll/confirm [post]
+func (h *Handler) ConfirmEnrollTOTP(c *gin.Context) {
+	if h.totpService == nil {
+		response.Error(c, errs.Internal("TOTP 服务未启用", nil))
+		return
+	}
+	var req TOTPEnrollConfirmRequest
+	if err := request.BindJSON(c, &req); err != nil {
+		response.Error(c, err)
+		return
+	}
+	result, err := h.totpService.ConfirmEnrollPending(c.Request.Context(), req.StepToken, req.Code)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, gin.H{
+		"stage":   string(authservice.LoginStageOK),
+		"token":   result.Token,
+		"expires": result.Expires.Format(constant.TIME_FORMAT),
+	})
 }
 
 // AdminResetTOTP 超管强制重置他人 TOTP。Casbin 已对 super admin 全部放行；

@@ -94,6 +94,22 @@ func (s *ApiSeeder) Run(db *gorm.DB, syncExisting bool) error {
 			Creator:  "系统",
 		},
 		{
+			Model:    model.Model{ID: 114},
+			Method:   "POST",
+			Path:     "/base/totp/enroll",
+			Category: "base",
+			Desc:     "登录中途首次绑定 TOTP（公开，凭 step_token）",
+			Creator:  "系统",
+		},
+		{
+			Model:    model.Model{ID: 115},
+			Method:   "POST",
+			Path:     "/base/totp/enroll/confirm",
+			Category: "base",
+			Desc:     "确认登录中途绑定并签发 access_token",
+			Creator:  "系统",
+		},
+		{
 			Model:    model.Model{ID: 4},
 			Method:   "GET",
 			Path:     "/admin/info",

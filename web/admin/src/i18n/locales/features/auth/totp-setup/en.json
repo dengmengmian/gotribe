@@ -1,0 +1,16 @@
+{
+  "title": "Set up two-factor verification",
+  "description": "Admin policy requires TOTP before sign-in is complete. Scan the QR with any TOTP authenticator (Google / Microsoft / 1Password, etc.) and enter the 6-digit code to finish setup.",
+  "manualSecret": "Or enter this secret manually",
+  "recoveryWarningTitle": "Save these recovery codes now",
+  "recoveryWarningBody": "Each of the 10 codes below can be used once if you lose your authenticator. They will not be shown again after this page is closed.",
+  "copyAll": "Copy all recovery codes",
+  "copied": "Copied",
+  "copyFailed": "Copy failed",
+  "confirmCodeLabel": "Enter the 6-digit code from your authenticator",
+  "confirmAndContinue": "Confirm and continue",
+  "enrollFailed": "Failed to start binding",
+  "confirmFailed": "Failed to confirm binding",
+  "footerText": "Need a different account?",
+  "backLink": "Back to sign in"
+}

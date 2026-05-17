@@ -61,7 +61,12 @@ service.interceptors.request.use(
  * 这些 API 的 401 错误不应该触发清除 token 或未授权事件
  * 因为这是正常的业务错误（如登录失败）
  */
-const AUTH_API_PATHS = ['/api/base/login', '/api/base/totp/verify']
+const AUTH_API_PATHS = [
+  '/api/base/login',
+  '/api/base/totp/verify',
+  '/api/base/totp/enroll',
+  '/api/base/totp/enroll/confirm',
+]
 
 /**
  * 检查请求 URL 是否是认证相关的 API

@@ -175,6 +175,9 @@ type AdminTOTPConfig struct {
 	Period              int    `mapstructure:"period"`
 	Digits              int    `mapstructure:"digits"`
 	Skew                int    `mapstructure:"skew"`
+	// Required 为 true 时，未绑 TOTP 的 admin 登录后必须强制完成绑定才能拿到 access_token；
+	// 为 false（默认）时只在登录成功响应里带 mfa_reminder=true，由用户自行决定是否绑定。
+	Required bool `mapstructure:"required"`
 }
 
 // StepTokenTTL 返回 step_token 时长。
@@ -357,6 +360,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("admin.totp.period", 30)
 	v.SetDefault("admin.totp.digits", 6)
 	v.SetDefault("admin.totp.skew", 1)
+	v.SetDefault("admin.totp.required", false)
 }
 
 // Address 返回 HTTP 服务监听地址。

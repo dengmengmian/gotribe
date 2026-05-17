@@ -44,6 +44,12 @@ type TOTPService interface {
 	Delete(ctx context.Context, admin *model.Admin, currentCode string) error
 	AdminReset(ctx context.Context, targetAdminID int64) error
 	IsBound(ctx context.Context, adminID int64) (bool, error)
+	// EnrollPending：admin.totp.required=true 时，用 step_token(purpose=totp_bind) 发起首次绑定，
+	// 返回 secret/QR/备份码。step_token 不会被消费，留给后续 ConfirmEnrollPending 使用。
+	EnrollPending(ctx context.Context, stepToken string) (*TOTPBindResult, error)
+	// ConfirmEnrollPending：用同一 step_token + 6 位码完成首次绑定并签发 access_token；
+	// 成功后该 step_token 失效（jti 黑名单）。
+	ConfirmEnrollPending(ctx context.Context, stepToken, code string) (*LoginResult, error)
 }
 
 // TOTPStatus 描述当前账户的 TOTP 绑定状态。
@@ -421,5 +427,118 @@ func randomRecoveryCode() (string, error) {
 		buf[i] = alphabet[int(buf[i])%len(alphabet)]
 	}
 	return string(buf[:4]) + "-" + string(buf[4:]), nil
+}
+
+// EnrollPending：用 step_token(purpose=totp_bind) 发起首次绑定。step_token 暂不消费，
+// 让用户在同一 step 内可以反复看 secret 和最终提交确认；ConfirmEnrollPending 才会作废 jti。
+func (s *totpService) EnrollPending(ctx context.Context, stepToken string) (*TOTPBindResult, error) {
+	claims, err := s.manager.VerifyStepToken(stepToken, core.StepTokenPurposeTOTPBind)
+	if err != nil {
+		return nil, errs.Unauthorized("step token 无效或已过期")
+	}
+	if used, _ := s.isStepJTIUsed(ctx, claims.ID); used {
+		return nil, errs.Unauthorized("step token 已被使用")
+	}
+
+	existing, err := s.repo.GetByAdminID(ctx, claims.AdminID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil && existing.Enabled {
+		return nil, errs.TOTPAlreadyBound("已绑定 TOTP，无需再次绑定")
+	}
+
+	admin, err := s.adminRepo.GetAdminByID(ctx, claims.AdminID)
+	if err != nil {
+		return nil, errs.Unauthorized("用户不存在")
+	}
+
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      s.cfg.Issuer,
+		AccountName: admin.Username,
+		Period:      uint(s.cfg.Period),
+		Digits:      otp.Digits(s.cfg.Digits),
+		Algorithm:   otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return nil, errs.Internal("生成 TOTP secret 失败", err)
+	}
+	secretCipher, err := s.cipher.EncryptToString(key.Secret())
+	if err != nil {
+		return nil, errs.Internal("加密 TOTP secret 失败", err)
+	}
+	recoveryCodes, recoveryRecords, err := s.generateRecoveryCodes()
+	if err != nil {
+		return nil, err
+	}
+	recoveryJSON, err := json.Marshal(recoveryRecords)
+	if err != nil {
+		return nil, errs.Internal("序列化备份码失败", err)
+	}
+	record := &model.AdminTOTP{
+		AdminID:       claims.AdminID,
+		SecretCipher:  secretCipher,
+		Enabled:       false,
+		RecoveryCodes: string(recoveryJSON),
+	}
+	if err := s.repo.Upsert(ctx, record); err != nil {
+		return nil, err
+	}
+	return &TOTPBindResult{
+		Secret:        key.Secret(),
+		OTPAuthURL:    key.URL(),
+		RecoveryCodes: recoveryCodes,
+	}, nil
+}
+
+// ConfirmEnrollPending：用同一 step_token + 6 位码激活绑定并签发 access_token。
+func (s *totpService) ConfirmEnrollPending(ctx context.Context, stepToken, code string) (*LoginResult, error) {
+	claims, err := s.manager.VerifyStepToken(stepToken, core.StepTokenPurposeTOTPBind)
+	if err != nil {
+		return nil, errs.Unauthorized("step token 无效或已过期")
+	}
+	if used, _ := s.isStepJTIUsed(ctx, claims.ID); used {
+		return nil, errs.Unauthorized("step token 已被使用")
+	}
+
+	record, err := s.repo.GetByAdminID(ctx, claims.AdminID)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, errs.TOTPNotBound("尚未发起绑定，请先调用 enroll")
+	}
+	if record.Enabled {
+		return nil, errs.TOTPAlreadyBound("已启用，无需重复确认")
+	}
+	secret, err := s.cipher.DecryptFromString(record.SecretCipher)
+	if err != nil {
+		return nil, errs.Internal("解密 TOTP secret 失败", err)
+	}
+	if !s.validateCode(secret, code) {
+		return nil, errs.TOTPInvalid("验证码错误")
+	}
+	if err := s.repo.MarkEnabled(ctx, claims.AdminID); err != nil {
+		return nil, err
+	}
+	now := time.Now().Unix()
+	_ = s.repo.UpdateLastUsedAt(ctx, claims.AdminID, now)
+	s.markStepJTIUsed(ctx, claims.ID, time.Until(claims.ExpiresAt.Time))
+
+	admin, err := s.adminRepo.GetAdminByID(ctx, claims.AdminID)
+	if err != nil {
+		return nil, errs.Unauthorized("用户不存在")
+	}
+	subject := core.Subject{UserID: admin.ID, Username: admin.Username}
+	token, expires, err := s.manager.SignAccessToken(s.audience, subject)
+	if err != nil {
+		return nil, errs.Internal("生成 token 失败", err)
+	}
+	return &LoginResult{
+		Stage:   LoginStageOK,
+		Token:   token,
+		Expires: expires,
+		User:    &admin,
+	}, nil
 }
 
