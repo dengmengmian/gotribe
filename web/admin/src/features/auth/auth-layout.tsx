@@ -1,13 +1,27 @@
+import { useI18n } from '@/context/i18n-provider'
+
 type AuthLayoutProps = {
   children: React.ReactNode
 }
 
 export function AuthLayout({ children }: AuthLayoutProps) {
+  const { t } = useI18n()
+
   return (
-    <div className='relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4 py-10'>
-      <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.1),transparent_32%)]' />
-      <div className='pointer-events-none absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.6),transparent)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]' />
-      <div className='relative mx-auto w-full max-w-[430px]'>{children}</div>
-    </div>
+    <main className='relative flex min-h-svh items-center justify-center overflow-hidden bg-background px-4 py-8 text-foreground sm:px-6'>
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:44px_44px] opacity-20 dark:opacity-15' />
+      <div className='pointer-events-none absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,var(--background),transparent)]' />
+      <div className='pointer-events-none absolute inset-x-0 bottom-0 h-52 bg-[linear-gradient(0deg,var(--background),transparent)]' />
+
+      <div className='relative flex w-full max-w-[560px] flex-col'>
+        <div className='mb-7 text-center'>
+          <p className='text-sm font-medium text-muted-foreground'>{t('features.auth.layout.description')}</p>
+          <h2 className='mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl'>
+            {t('features.auth.layout.headline')}
+          </h2>
+        </div>
+        {children}
+      </div>
+    </main>
   )
 }

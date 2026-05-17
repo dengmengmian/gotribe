@@ -99,7 +99,6 @@ export const sidebarData: SidebarData = {
           icon: LogIn,
           items: [
             { title: 'Sign In', url: '/sign-in' },
-            { title: 'Sign Up', url: '/sign-up' },
             { title: 'OTP', url: '/otp' },
           ],
         },

@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/card'
 import { useI18n } from '@/context/i18n-provider'
 import { AuthLayout } from '../auth-layout'
-import { AuthBrand } from '../auth-brand'
 import { OtpForm } from './components/otp-form'
 
 export function Otp() {
@@ -19,8 +18,7 @@ export function Otp() {
     <AuthLayout>
       <Card className='w-full border shadow-sm'>
         <CardHeader className='pb-4 pt-6'>
-          <AuthBrand />
-          <div className='space-y-1.5 border-t pt-5'>
+          <div className='space-y-1.5'>
             <CardTitle className='text-base font-medium'>
               {t('features.auth.otp.title')}
             </CardTitle>
