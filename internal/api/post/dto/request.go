@@ -15,6 +15,7 @@ type ListQuery struct {
 	Status      *int16 `form:"status" binding:"omitempty,oneof=0 1 2"`
 	Type        *int16 `form:"type" binding:"omitempty"`
 	DynamicType string `form:"dynamic_type" binding:"omitempty,max=50"`
+	CategoryID  *int64 `form:"category_id" binding:"omitempty,min=1"`
 }
 
 // DetailQuery 表示文章详情接口支持的查询条件。

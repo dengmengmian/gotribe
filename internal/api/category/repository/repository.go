@@ -31,3 +31,19 @@ func (r *Repository) ListByParentID(ctx context.Context, parentID int64) ([]mode
 	}
 	return categories, nil
 }
+
+// ListByIDs 按 ID 集合批量查询分类。
+func (r *Repository) ListByIDs(ctx context.Context, ids []int64) ([]model.Category, error) {
+	var categories []model.Category
+	if len(ids) == 0 {
+		return categories, nil
+	}
+	err := r.tx.DB(ctx).
+		Model(&model.Category{}).
+		Where("id IN ?", ids).
+		Find(&categories).Error
+	if err != nil {
+		return nil, err
+	}
+	return categories, nil
+}

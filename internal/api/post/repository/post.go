@@ -104,5 +104,8 @@ func (r *Repository) baseQuery(ctx context.Context, projectID string, filter Lis
 	if strings.TrimSpace(filter.DynamicType) != "" {
 		db = db.Where("dynamic_type = ?", strings.TrimSpace(filter.DynamicType))
 	}
+	if filter.CategoryID != nil && *filter.CategoryID > 0 {
+		db = db.Where("category_id = ?", *filter.CategoryID)
+	}
 	return db
 }

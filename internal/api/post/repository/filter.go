@@ -12,4 +12,5 @@ type ListFilter struct {
 	Type        *int16
 	DynamicType string
 	TagIDs      []int64
+	CategoryID  *int64
 }

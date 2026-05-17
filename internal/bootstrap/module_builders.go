@@ -3,6 +3,8 @@
 package bootstrap
 
 import (
+	categoryhandler "gotribe/internal/api/category/handler"
+	categoryrepo "gotribe/internal/api/category/repository"
 	confighandler "gotribe/internal/api/config/handler"
 	configrepo "gotribe/internal/api/config/repository"
 	configservice "gotribe/internal/api/config/service"
@@ -60,6 +62,11 @@ type TagModule struct {
 	Handler *taghandler.Handler
 }
 
+// CategoryModule 汇总 category 模块对外暴露的能力。
+type CategoryModule struct {
+	Handler *categoryhandler.Handler
+}
+
 // ConfigModule 汇总 config 模块对外暴露的能力。
 type ConfigModule struct {
 	Handler *confighandler.Handler
@@ -77,6 +84,7 @@ type Modules struct {
 	Profile   ProfileModule
 	Post      PostModule
 	Tag       TagModule
+	Category  CategoryModule
 	Config    ConfigModule
 	Example   ExampleModule
 	UserEvent UserEventModule
@@ -88,6 +96,7 @@ func buildModules(infra *Infra) *Modules {
 	profile := buildProfileModule(infra)
 	post := buildPostModule(infra)
 	tag := buildTagModule(infra)
+	category := buildCategoryModule(infra)
 	config := buildConfigModule(infra)
 	example := buildExampleModule(infra, post.Service)
 	userEvent := buildUserEventModule(infra)
@@ -97,6 +106,7 @@ func buildModules(infra *Infra) *Modules {
 		Auth:      auth,
 		Profile:   profile,
 		Tag:       tag,
+		Category:  category,
 		Config:    config,
 		Post:      post,
 		Example:   example,
@@ -131,7 +141,8 @@ func buildProfileModule(infra *Infra) ProfileModule {
 func buildPostModule(infra *Infra) PostModule {
 	repo := postrepo.NewRepository(infra.Tx)
 	tagRepository := tagrepo.NewRepository(infra.Tx)
-	service := postservice.NewService(repo, tagRepository, infra.Store, infra.CacheTTL)
+	categoryRepository := categoryrepo.NewRepository(infra.Tx)
+	service := postservice.NewService(repo, tagRepository, categoryRepository, infra.Store, infra.CacheTTL)
 	return PostModule{
 		Service: service,
 		Handler: posthandler.NewHandler(service),
@@ -150,6 +161,13 @@ func buildTagModule(infra *Infra) TagModule {
 	repo := tagrepo.NewRepository(infra.Tx)
 	return TagModule{
 		Handler: taghandler.NewHandler(repo),
+	}
+}
+
+func buildCategoryModule(infra *Infra) CategoryModule {
+	repo := categoryrepo.NewRepository(infra.Tx)
+	return CategoryModule{
+		Handler: categoryhandler.NewHandler(repo),
 	}
 }
 

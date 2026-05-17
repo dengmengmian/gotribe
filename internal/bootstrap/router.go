@@ -92,6 +92,7 @@ func NewRouter(cfg config.Config, providers *Providers) (*gin.Engine, error) {
 	providers.Modules.Config.Handler.RegisterRoutes(public, apiLimiter)
 	providers.Modules.Profile.Handler.RegisterRoutes(secured, currentUser, apiLimiter, authLimiter)
 	providers.Modules.Tag.Handler.RegisterRoutes(public)
+	providers.Modules.Category.Handler.RegisterRoutes(public)
 	providers.Modules.Example.Handler.RegisterRoutes(currentUser, apiLimiter)
 	providers.Modules.UserEvent.Handler.RegisterRoutes(secured, eventLimiter)
 

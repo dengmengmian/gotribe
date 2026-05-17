@@ -10,6 +10,13 @@ type TagResponse struct {
 	Color string `json:"color"`
 }
 
+// CategoryResponse 表示文章接口返回的分类信息。
+type CategoryResponse struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	Slug  string `json:"slug"`
+}
+
 // PostResponse 表示文章列表或详情接口的响应数据。
 type PostResponse struct {
 	ID           int64         `json:"id"`
@@ -38,7 +45,8 @@ type PostResponse struct {
 	EventStartAt string        `json:"event_start_at"`
 	EventEndAt   string        `json:"event_end_at"`
 	RegisterURL  string        `json:"register_url"`
-	Tags         []TagResponse `json:"tags"`
-	CreatedAt    string        `json:"created_at"`
-	UpdatedAt    string        `json:"updated_at"`
+	Tags         []TagResponse     `json:"tags"`
+	Category     *CategoryResponse `json:"category,omitempty"`
+	CreatedAt    string            `json:"created_at"`
+	UpdatedAt    string            `json:"updated_at"`
 }

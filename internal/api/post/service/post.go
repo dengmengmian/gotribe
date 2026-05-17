@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	categoryrepo "gotribe/internal/api/category/repository"
 	postdto "gotribe/internal/api/post/dto"
 	postrepo "gotribe/internal/api/post/repository"
 	postview "gotribe/internal/api/post/view"
@@ -27,19 +28,21 @@ var htmlTagPattern = regexp.MustCompile(`<[^>]+>`)
 
 // Service 负责封装文章相关的业务逻辑。
 type Service struct {
-	repo     *postrepo.Repository
-	tags     *tagrepo.Repository
-	cache    *cache.Store
-	cacheTTL int
+	repo       *postrepo.Repository
+	tags       *tagrepo.Repository
+	categories *categoryrepo.Repository
+	cache      *cache.Store
+	cacheTTL   int
 }
 
 // NewService 创建文章服务实例。cacheTTL 由 config.Load 校验保证为正值。
-func NewService(repo *postrepo.Repository, tags *tagrepo.Repository, cache *cache.Store, cacheTTL int) *Service {
+func NewService(repo *postrepo.Repository, tags *tagrepo.Repository, categories *categoryrepo.Repository, cache *cache.Store, cacheTTL int) *Service {
 	return &Service{
-		repo:     repo,
-		tags:     tags,
-		cache:    cache,
-		cacheTTL: cacheTTL,
+		repo:       repo,
+		tags:       tags,
+		categories: categories,
+		cache:      cache,
+		cacheTTL:   cacheTTL,
 	}
 }
 
@@ -66,6 +69,7 @@ func (s *Service) List(ctx context.Context, projectID string, query postdto.List
 		Type:        query.Type,
 		DynamicType: query.DynamicType,
 		TagIDs:      tagIDs,
+		CategoryID:  query.CategoryID,
 	}
 
 	posts, total, err := s.repo.List(ctx, projectID, filter)
@@ -78,10 +82,15 @@ func (s *Service) List(ctx context.Context, projectID string, query postdto.List
 		return nil, database.Pagination{}, errs.Internal("list post tags", err)
 	}
 
+	categoriesByID, err := s.loadCategoriesByID(ctx, posts)
+	if err != nil {
+		return nil, database.Pagination{}, errs.Internal("list post categories", err)
+	}
+
 	page, perPage := database.NormalizePagination(query.Page, query.PerPage)
 	items := make([]postdto.PostResponse, 0, len(posts))
 	for _, item := range posts {
-		items = append(items, toPostResponse(item, tagsByPostID[item.ID], false))
+		items = append(items, toPostResponse(item, tagsByPostID[item.ID], categoriesByID[item.CategoryID], false))
 	}
 	return items, database.Pagination{Page: page, PerPage: perPage, Total: total}, nil
 }
@@ -108,7 +117,12 @@ func (s *Service) Detail(ctx context.Context, projectID, postID, password string
 		return nil, errs.Internal("load post tags", err)
 	}
 
-	resp := toPostResponse(*post, tagsByPostID[post.ID], true)
+	categoriesByID, err := s.loadCategoriesByID(ctx, []model.Post{*post})
+	if err != nil {
+		return nil, errs.Internal("load post categories", err)
+	}
+
+	resp := toPostResponse(*post, tagsByPostID[post.ID], categoriesByID[post.CategoryID], true)
 	if post.IsPasswd == 0 {
 		_ = s.cache.SetJSON(ctx, cacheKey, resp, time.Duration(s.cacheTTL)*time.Minute)
 	}
@@ -143,8 +157,32 @@ func (s *Service) loadTagsByPostID(ctx context.Context, posts []model.Post) (map
 	return s.tags.ListByPostIDs(ctx, postIDs)
 }
 
+// loadCategoriesByID 按文章集合批量加载分类信息。
+func (s *Service) loadCategoriesByID(ctx context.Context, posts []model.Post) (map[int64]model.Category, error) {
+	categoryIDs := make([]int64, 0, len(posts))
+	seen := make(map[int64]struct{})
+	for _, post := range posts {
+		if post.CategoryID == 0 {
+			continue
+		}
+		if _, ok := seen[post.CategoryID]; !ok {
+			seen[post.CategoryID] = struct{}{}
+			categoryIDs = append(categoryIDs, post.CategoryID)
+		}
+	}
+	categories, err := s.categories.ListByIDs(ctx, categoryIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64]model.Category, len(categories))
+	for _, c := range categories {
+		result[c.ID] = c
+	}
+	return result, nil
+}
+
 // toPostResponse 将文章模型和标签信息组装为接口响应。
-func toPostResponse(post model.Post, tagModels []model.Tag, includeBody bool) postdto.PostResponse {
+func toPostResponse(post model.Post, tagModels []model.Tag, categoryModel model.Category, includeBody bool) postdto.PostResponse {
 	tags := make([]postdto.TagResponse, 0, len(tagModels))
 	for _, item := range tagModels {
 		tags = append(tags, postdto.TagResponse{
@@ -153,6 +191,15 @@ func toPostResponse(post model.Post, tagModels []model.Tag, includeBody bool) po
 			Slug:  item.Slug,
 			Color: item.Color,
 		})
+	}
+
+	var category *postdto.CategoryResponse
+	if categoryModel.ID != 0 {
+		category = &postdto.CategoryResponse{
+			ID:    categoryModel.ID,
+			Title: categoryModel.Title,
+			Slug:  categoryModel.Slug,
+		}
 	}
 
 	content := ""
@@ -189,6 +236,7 @@ func toPostResponse(post model.Post, tagModels []model.Tag, includeBody bool) po
 		EventEndAt:   toTimeString(post.EventEndAt),
 		RegisterURL:  post.RegisterURL,
 		Tags:         tags,
+		Category:     category,
 		CreatedAt:    post.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:    post.UpdatedAt.Format(time.RFC3339),
 	}
