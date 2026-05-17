@@ -58,6 +58,6 @@ EOF
 
 echo "==> create archive"
 rm -f "$PACKAGE_PATH"
-tar -C "$RELEASE_DIR" -czf "$PACKAGE_PATH" gotribe
+COPYFILE_DISABLE=1 tar --no-xattrs -C "$RELEASE_DIR" -czf "$PACKAGE_PATH" gotribe
 
 echo "package created: $PACKAGE_PATH"
