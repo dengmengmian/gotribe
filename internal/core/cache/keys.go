@@ -85,6 +85,11 @@ func (b *KeyBuilder) PostListPattern() string {
 	return fmt.Sprintf("%s:post:list:*", b.prefix)
 }
 
+// PostListPatternByProject 返回指定项目的文章列表缓存键匹配模式。
+func (b *KeyBuilder) PostListPatternByProject(projectID string) string {
+	return fmt.Sprintf("%s:post:list:%s:*", b.prefix, strings.TrimSpace(projectID))
+}
+
 // AdminLoginFailAccountKey 返回 admin 账户维度登录失败计数键。
 // 使用 hash 隐藏明文用户名，避免 Redis 中泄露用户名枚举。
 func (b *KeyBuilder) AdminLoginFailAccountKey(username string) string {

@@ -230,6 +230,13 @@ func (r *Repository) Update(ctx context.Context, post *model.Post) error {
 	return syncPostTags(db, post.ID, post.Tag)
 }
 
+// ListProjectIDsByIDs 按文章 ID 列表查询涉及的项目 ID（去重）。
+func (r *Repository) ListProjectIDsByIDs(ctx context.Context, ids []int64) ([]int64, error) {
+	var projectIDs []int64
+	err := r.tx.DB(ctx).Model(&model.Post{}).Distinct("project_id").Where("id IN ?", ids).Pluck("project_id", &projectIDs).Error
+	return projectIDs, err
+}
+
 // Delete 批量删除
 func (r *Repository) Delete(ctx context.Context, ids []int64) error {
 	var posts []model.Post

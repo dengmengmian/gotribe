@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -58,13 +59,14 @@ func (s *postService) List(ctx context.Context, req *dto.PostListRequest) ([]*mo
 	return s.postRepo.List(ctx, req)
 }
 
-// clearPostListCache 清除文章列表缓存（best effort）。
-func (s *postService) clearPostListCache(ctx context.Context) {
-	if s.cache == nil {
+// clearPostListCacheByProject 按项目精确清除文章列表缓存（best effort）。
+func (s *postService) clearPostListCacheByProject(ctx context.Context, projectID int64) {
+	if s.cache == nil || projectID <= 0 {
 		return
 	}
-	if err := s.cache.DeleteByPattern(ctx, s.cache.PostListPattern()); err != nil {
-		s.log.Warnf("清除文章列表缓存失败: %v", err)
+	pattern := s.cache.PostListPatternByProject(fmt.Sprintf("%d", projectID))
+	if err := s.cache.DeleteByPattern(ctx, pattern); err != nil {
+		s.log.Warnf("清除项目 %d 文章列表缓存失败: %v", projectID, err)
 	}
 }
 
@@ -121,7 +123,7 @@ func (s *postService) Create(ctx context.Context, req *dto.CreatePostRequest) er
 		return nil
 	})
 	if err == nil {
-		s.clearPostListCache(ctx)
+		s.clearPostListCacheByProject(ctx, post.ProjectID)
 	}
 	return err
 }
@@ -180,7 +182,7 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 		return nil
 	})
 	if err == nil {
-		s.clearPostListCache(ctx)
+		s.clearPostListCacheByProject(ctx, oldPost.ProjectID)
 	}
 	return err
 }
@@ -190,11 +192,17 @@ func (s *postService) Delete(ctx context.Context, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
+	projectIDs, err := s.postRepo.ListProjectIDsByIDs(ctx, ids)
+	if err != nil {
+		s.log.Warnf("查询待删除文章的项目ID失败: %v", err)
+	}
+	err = s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		return s.postRepo.Delete(txCtx, ids)
 	})
 	if err == nil {
-		s.clearPostListCache(ctx)
+		for _, pid := range projectIDs {
+			s.clearPostListCacheByProject(ctx, pid)
+		}
 	}
 	return err
 }
@@ -212,7 +220,7 @@ func (s *postService) Publish(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	s.clearPostListCache(ctx)
+	s.clearPostListCacheByProject(ctx, oldPost.ProjectID)
 	projectInfo, err := s.projectRepo.GetProjectByID(ctx, oldPost.ProjectID)
 	if err != nil {
 		s.log.Errorf("获取项目信息失败: %v", err)

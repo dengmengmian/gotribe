@@ -44,6 +44,11 @@ func (s *Store) PostListPattern() string {
 	return s.keys.PostListPattern()
 }
 
+// PostListPatternByProject 返回指定项目的文章列表缓存键匹配模式。
+func (s *Store) PostListPatternByProject(projectID string) string {
+	return s.keys.PostListPatternByProject(projectID)
+}
+
 // Keys 返回底层键构建器，供特殊场景复用。
 func (s *Store) Keys() *KeyBuilder {
 	return s.keys
