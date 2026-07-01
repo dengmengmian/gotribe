@@ -1,14 +1,5 @@
 package handler
 
-import (
-	"github.com/gin-gonic/gin"
-)
-
-// RegisterRoutes 注册任务管理路由
-func (h *Handler) RegisterRoutes(group *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	group.GET("/jobs", authMiddleware, h.ListJobs)
-	group.GET("/jobs/:name/status", authMiddleware, h.GetJobStatus)
-	group.GET("/jobs/:name/history", authMiddleware, h.GetJobHistory)
-	group.POST("/jobs/:name/enable", authMiddleware, h.EnableJob)
-	group.POST("/jobs/:name/disable", authMiddleware, h.DisableJob)
-}
+// 任务管理路由由 internal/admin/routes/routes.go 的 registerJobRoutes 统一注册：
+// 在 /api/jobs 组上统一施加 jwt + adminLoader + Casbin 中间件。
+// 本模块不再单独定义 RegisterRoutes，避免与 registerJobRoutes「双重定义」造成路由漂移。

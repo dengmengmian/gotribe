@@ -149,7 +149,10 @@ func (a *Repository) Update(ctx context.Context, apiID int64, api *model.Api) er
 		// 接口在casbin的policy中存在才进行操作
 		if len(policies) > 0 {
 			// 先删除
-			isRemoved, _ := a.enforcer.RemovePolicies(policies)
+			isRemoved, err := a.enforcer.RemovePolicies(policies)
+			if err != nil {
+				return fmt.Errorf("更新权限接口失败: %w", err)
+			}
 			if !isRemoved {
 				return errors.New("更新权限接口失败")
 			}
@@ -158,17 +161,18 @@ func (a *Repository) Update(ctx context.Context, apiID int64, api *model.Api) er
 				policy[2] = api.Method
 			}
 			// 新增
-			isAdded, _ := a.enforcer.AddPolicies(policies)
+			isAdded, err := a.enforcer.AddPolicies(policies)
+			if err != nil {
+				return fmt.Errorf("更新权限接口失败: %w", err)
+			}
 			if !isAdded {
 				return errors.New("更新权限接口失败")
 			}
 			// 加载policy
-			err := a.enforcer.LoadPolicy()
-			if err != nil {
+			if err := a.enforcer.LoadPolicy(); err != nil {
 				return errors.New("更新权限接口成功，权限接口策略加载失败")
-			} else {
-				return err
 			}
+			return nil
 		}
 	}
 	return err
@@ -190,7 +194,10 @@ func (a *Repository) Delete(ctx context.Context, apiIds []int64) error {
 		for _, api := range apis {
 			policies, _ := a.enforcer.GetFilteredPolicy(1, api.Path, api.Method)
 			if len(policies) > 0 {
-				isRemoved, _ := a.enforcer.RemovePolicies(policies)
+				isRemoved, err := a.enforcer.RemovePolicies(policies)
+				if err != nil {
+					return fmt.Errorf("删除权限接口失败: %w", err)
+				}
 				if !isRemoved {
 					return errors.New("删除权限接口失败")
 				}

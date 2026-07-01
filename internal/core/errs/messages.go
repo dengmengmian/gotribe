@@ -21,15 +21,16 @@ const (
 	MsgJWTAuthFail         MsgKey = "jwt_auth_fail"
 	MsgUserSerializeFail   MsgKey = "user_serialize_fail"
 
-	MsgUserNotFound      MsgKey = "user_not_found"
-	MsgUserDisabled      MsgKey = "user_disabled"
-	MsgUserRoleDisabled  MsgKey = "user_role_disabled"
-	MsgPasswordIncorrect MsgKey = "password_incorrect"
-	MsgUserNotLoggedIn   MsgKey = "user_not_logged_in"
-	MsgUserNotFoundByID  MsgKey = "user_not_found_by_id"
-	MsgNoUsersFound      MsgKey = "no_users_found"
-	MsgRoleInfoFailed    MsgKey = "role_info_failed"
-	MsgNoUsersWithRole   MsgKey = "no_users_with_role"
+	MsgUserNotFound       MsgKey = "user_not_found"
+	MsgUserDisabled       MsgKey = "user_disabled"
+	MsgUserRoleDisabled   MsgKey = "user_role_disabled"
+	MsgPasswordIncorrect  MsgKey = "password_incorrect"
+	MsgInvalidCredentials MsgKey = "invalid_credentials"
+	MsgUserNotLoggedIn    MsgKey = "user_not_logged_in"
+	MsgUserNotFoundByID   MsgKey = "user_not_found_by_id"
+	MsgNoUsersFound       MsgKey = "no_users_found"
+	MsgRoleInfoFailed     MsgKey = "role_info_failed"
+	MsgNoUsersWithRole    MsgKey = "no_users_with_role"
 
 	MsgGetRoleApisFailed    MsgKey = "get_role_apis_failed"
 	MsgLoadRolePolicyFailed MsgKey = "load_role_policy_failed"
@@ -65,6 +66,7 @@ var i18nMessages = map[string]map[MsgKey]string{
 		MsgUserDisabled:         "用户被禁用",
 		MsgUserRoleDisabled:     "用户角色被禁用",
 		MsgPasswordIncorrect:    "密码错误",
+		MsgInvalidCredentials:   "用户名或密码错误",
 		MsgUserNotLoggedIn:      "用户未登录",
 		MsgUserNotFoundByID:     "未获取到ID为%d的用户",
 		MsgNoUsersFound:         "未获取到任何用户信息",
@@ -101,6 +103,7 @@ var i18nMessages = map[string]map[MsgKey]string{
 		MsgUserDisabled:         "User is disabled",
 		MsgUserRoleDisabled:     "User role is disabled",
 		MsgPasswordIncorrect:    "Incorrect password",
+		MsgInvalidCredentials:   "Invalid username or password",
 		MsgUserNotLoggedIn:      "User not logged in",
 		MsgUserNotFoundByID:     "User not found by ID %d",
 		MsgNoUsersFound:         "No users found",

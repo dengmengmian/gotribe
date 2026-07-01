@@ -21,7 +21,10 @@ import (
 	"gotribe/internal/core/cache"
 	"gotribe/internal/core/database"
 	"gotribe/internal/core/errs"
+	applog "gotribe/internal/core/logger"
 	"gotribe/internal/model"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // listCacheEntry 用于文章列表缓存的序列化结构。
@@ -39,6 +42,8 @@ type Service struct {
 	categories *categoryrepo.Repository
 	cache      *cache.Store
 	cacheTTL   int
+	// sf 合并同一 key 的并发回源，防止热点缓存过期瞬间大量请求同时打 DB（缓存击穿）。
+	sf singleflight.Group
 }
 
 // NewService 创建文章服务实例。cacheTTL 由 config.Load 校验保证为正值。
@@ -55,93 +60,148 @@ func NewService(repo *postrepo.Repository, tags *tagrepo.Repository, categories 
 // List 查询文章列表并附带标签和分页信息，结果按查询条件缓存 3 分钟。
 func (s *Service) List(ctx context.Context, projectID string, query postdto.ListQuery) ([]postdto.PostResponse, database.Pagination, error) {
 	cacheKey := s.cache.PostListKey(projectID, listCacheFilter(query))
-	var cached listCacheEntry
-	if ok, err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil && ok {
-		return cached.Items, cached.Meta, nil
+	if entry, ok := s.readListCache(ctx, cacheKey); ok {
+		return entry.Items, entry.Meta, nil
 	}
 
-	var tagIDs []int64
-	var err error
-	if tag := strings.TrimSpace(query.Tag); tag != "" {
-		tagIDs, err = s.tags.FindIDsByKeyword(ctx, tag)
+	// singleflight 合并并发回源；返回值不缓存（如无匹配标签的空结果）时用 cached=false 标记。
+	v, err, _ := s.sf.Do(cacheKey, func() (any, error) {
+		if entry, ok := s.readListCache(ctx, cacheKey); ok {
+			return entry, nil
+		}
+
+		var tagIDs []int64
+		if tag := strings.TrimSpace(query.Tag); tag != "" {
+			ids, err := s.tags.FindIDsByKeyword(ctx, tag)
+			if err != nil {
+				return nil, errs.Internal("find tags", err)
+			}
+			if len(ids) == 0 {
+				page, perPage := database.NormalizePagination(query.Page, query.PerPage)
+				return listCacheEntry{Items: []postdto.PostResponse{}, Meta: database.Pagination{Page: page, PerPage: perPage, Total: 0}}, nil
+			}
+			tagIDs = ids
+		}
+
+		filter := postrepo.ListFilter{
+			Page:        query.Page,
+			PerPage:     query.PerPage,
+			Keyword:     query.Keyword,
+			Status:      query.Status,
+			Type:        query.Type,
+			DynamicType: query.DynamicType,
+			TagIDs:      tagIDs,
+			CategoryID:  query.CategoryID,
+		}
+
+		posts, total, err := s.repo.List(ctx, projectID, filter)
 		if err != nil {
-			return nil, database.Pagination{}, errs.Internal("find tags", err)
+			return nil, errs.Internal("list posts", err)
 		}
-		if len(tagIDs) == 0 {
-			page, perPage := database.NormalizePagination(query.Page, query.PerPage)
-			return []postdto.PostResponse{}, database.Pagination{Page: page, PerPage: perPage, Total: 0}, nil
+
+		tagsByPostID, err := s.loadTagsByPostID(ctx, posts)
+		if err != nil {
+			return nil, errs.Internal("list post tags", err)
 		}
-	}
 
-	filter := postrepo.ListFilter{
-		Page:        query.Page,
-		PerPage:     query.PerPage,
-		Keyword:     query.Keyword,
-		Status:      query.Status,
-		Type:        query.Type,
-		DynamicType: query.DynamicType,
-		TagIDs:      tagIDs,
-		CategoryID:  query.CategoryID,
-	}
+		categoriesByID, err := s.loadCategoriesByID(ctx, posts)
+		if err != nil {
+			return nil, errs.Internal("list post categories", err)
+		}
 
-	posts, total, err := s.repo.List(ctx, projectID, filter)
+		page, perPage := database.NormalizePagination(query.Page, query.PerPage)
+		items := make([]postdto.PostResponse, 0, len(posts))
+		for _, item := range posts {
+			items = append(items, toPostResponse(item, tagsByPostID[item.ID], categoriesByID[item.CategoryID], false))
+		}
+
+		entry := listCacheEntry{Items: items, Meta: database.Pagination{Page: page, PerPage: perPage, Total: total}}
+		_ = s.cache.SetJSON(ctx, cacheKey, entry, cache.JitterTTL(time.Duration(s.cacheTTL)*time.Minute))
+		return entry, nil
+	})
 	if err != nil {
-		return nil, database.Pagination{}, errs.Internal("list posts", err)
+		return nil, database.Pagination{}, err
 	}
+	entry := v.(listCacheEntry)
+	return entry.Items, entry.Meta, nil
+}
 
-	tagsByPostID, err := s.loadTagsByPostID(ctx, posts)
+// readListCache 读取列表缓存；命中返回 (entry, true)。读错误（非 miss）记日志但按未命中处理。
+func (s *Service) readListCache(ctx context.Context, cacheKey string) (listCacheEntry, bool) {
+	var cached listCacheEntry
+	ok, err := s.cache.GetJSON(ctx, cacheKey, &cached)
 	if err != nil {
-		return nil, database.Pagination{}, errs.Internal("list post tags", err)
+		applog.Warn(ctx, "post list cache read failed", "err", err)
+		return listCacheEntry{}, false
 	}
+	return cached, ok
+}
 
-	categoriesByID, err := s.loadCategoriesByID(ctx, posts)
-	if err != nil {
-		return nil, database.Pagination{}, errs.Internal("list post categories", err)
-	}
-
-	page, perPage := database.NormalizePagination(query.Page, query.PerPage)
-	items := make([]postdto.PostResponse, 0, len(posts))
-	for _, item := range posts {
-		items = append(items, toPostResponse(item, tagsByPostID[item.ID], categoriesByID[item.CategoryID], false))
-	}
-
-	meta := database.Pagination{Page: page, PerPage: perPage, Total: total}
-	_ = s.cache.SetJSON(ctx, cacheKey, listCacheEntry{Items: items, Meta: meta}, time.Duration(s.cacheTTL)*time.Minute)
-	return items, meta, nil
+// detailResult 是 Detail 回源的中间结果：resp 为组装好的详情，
+// isPasswd/password 用于回源后按「每个请求各自的密码」独立校验（密码文不进缓存、也不并发共享结果绕过校验）。
+type detailResult struct {
+	resp     *postdto.PostResponse
+	isPasswd int64
+	password string
 }
 
 // Detail 查询文章详情，并在需要时校验访问密码。
 func (s *Service) Detail(ctx context.Context, projectID, postID, password string) (*postdto.PostResponse, error) {
 	cacheKey := s.cache.PostDetailKey(projectID, postID)
-	var cached postdto.PostResponse
-	if ok, err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil && ok {
-		return &cached, nil
+	// 缓存里只存无密码文章，命中即可直接返回（无需再校验密码）。
+	if resp, ok := s.readDetailCache(ctx, cacheKey); ok {
+		return resp, nil
 	}
 
-	post, err := s.repo.GetByPostID(ctx, projectID, postID)
+	// singleflight 合并并发回源（DB 读取 + 组装），密码校验放在回源之后按请求各自进行。
+	v, err, _ := s.sf.Do(cacheKey, func() (any, error) {
+		if resp, ok := s.readDetailCache(ctx, cacheKey); ok {
+			return &detailResult{resp: resp}, nil
+		}
+
+		post, err := s.repo.GetByPostID(ctx, projectID, postID)
+		if err != nil {
+			return nil, errs.NotFound("post not found", err)
+		}
+
+		tagsByPostID, err := s.loadTagsByPostID(ctx, []model.Post{*post})
+		if err != nil {
+			return nil, errs.Internal("load post tags", err)
+		}
+		categoriesByID, err := s.loadCategoriesByID(ctx, []model.Post{*post})
+		if err != nil {
+			return nil, errs.Internal("load post categories", err)
+		}
+
+		resp := toPostResponse(*post, tagsByPostID[post.ID], categoriesByID[post.CategoryID], true)
+		if post.IsPasswd == 0 {
+			_ = s.cache.SetJSON(ctx, cacheKey, resp, cache.JitterTTL(time.Duration(s.cacheTTL)*time.Minute))
+		}
+		return &detailResult{resp: &resp, isPasswd: post.IsPasswd, password: post.PassWord}, nil
+	})
 	if err != nil {
-		return nil, errs.NotFound("post not found", err)
+		return nil, err
 	}
 
-	if post.IsPasswd != 0 && subtle.ConstantTimeCompare([]byte(post.PassWord), []byte(password)) != 1 {
+	result := v.(*detailResult)
+	if result.isPasswd != 0 && subtle.ConstantTimeCompare([]byte(result.password), []byte(password)) != 1 {
 		return nil, errs.Forbidden("post password is invalid")
 	}
+	return result.resp, nil
+}
 
-	tagsByPostID, err := s.loadTagsByPostID(ctx, []model.Post{*post})
+// readDetailCache 读取详情缓存；读错误（非 miss）记日志但按未命中处理。
+func (s *Service) readDetailCache(ctx context.Context, cacheKey string) (*postdto.PostResponse, bool) {
+	var cached postdto.PostResponse
+	ok, err := s.cache.GetJSON(ctx, cacheKey, &cached)
 	if err != nil {
-		return nil, errs.Internal("load post tags", err)
+		applog.Warn(ctx, "post detail cache read failed", "err", err)
+		return nil, false
 	}
-
-	categoriesByID, err := s.loadCategoriesByID(ctx, []model.Post{*post})
-	if err != nil {
-		return nil, errs.Internal("load post categories", err)
+	if !ok {
+		return nil, false
 	}
-
-	resp := toPostResponse(*post, tagsByPostID[post.ID], categoriesByID[post.CategoryID], true)
-	if post.IsPasswd == 0 {
-		_ = s.cache.SetJSON(ctx, cacheKey, resp, time.Duration(s.cacheTTL)*time.Minute)
-	}
-	return &resp, nil
+	return &cached, true
 }
 
 // GetSummaries 按业务文章 ID 集合返回供其他模块复用的文章摘要。

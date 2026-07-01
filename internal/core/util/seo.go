@@ -6,15 +6,19 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // SEO SEO工具类，用于处理SEO相关操作
 type SEO struct{}
 
+// seoHTTPClient 带超时的 HTTP 客户端，避免第三方（百度）不响应时请求无限挂起、goroutine 泄漏。
+var seoHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
 // PushBaidu 推送URL到百度
 func (s *SEO) PushBaidu(site, token string, urls string) (bool, error) {
 	api := "http://data.zz.baidu.com/urls?site=" + site + "&token=" + token
-	resp, err := http.Post(api, "text/plain", strings.NewReader(urls))
+	resp, err := seoHTTPClient.Post(api, "text/plain", strings.NewReader(urls))
 	if err != nil {
 		return false, fmt.Errorf("推送失败: %v", err)
 	}

@@ -11,10 +11,10 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"gotribe/internal/core/database"
-	"gotribe/internal/core/middleware"
 	usereventrepo "gotribe/internal/api/user_event/repository"
 	usereventservice "gotribe/internal/api/user_event/service"
+	"gotribe/internal/core/database"
+	"gotribe/internal/core/middleware"
 )
 
 func TestHandler_Create(t *testing.T) {
@@ -43,6 +43,7 @@ func TestHandler_Create(t *testing.T) {
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
 		c.Set(middleware.ContextKeyAuth, &middleware.AuthContext{UserID: 1, ProjectID: "1", Username: "tester"})
+		c.Set(middleware.ContextKeyProjectID, "1")
 		c.Next()
 	})
 	engine.POST("/events", handler.Create)

@@ -7,11 +7,11 @@ import (
 
 	adminrepo "gotribe/internal/admin/admin_user/repository"
 	apirepo "gotribe/internal/admin/api/repository"
-	"gotribe/internal/core/errs"
 	menurepo "gotribe/internal/admin/menu/repository"
 	"gotribe/internal/admin/role/dto"
 	"gotribe/internal/admin/role/repository"
 	"gotribe/internal/core/database"
+	"gotribe/internal/core/errs"
 	"gotribe/internal/model"
 
 	"github.com/casbin/casbin/v2"
@@ -141,16 +141,21 @@ func (s *service) Update(ctx context.Context, actor model.Admin, roleID int64, r
 			policy[0] = req.Keyword
 		}
 
-		isAdded, _ := s.enforcer.AddPolicies(rolePolicies)
+		isAdded, err := s.enforcer.AddPolicies(rolePolicies)
+		if err != nil {
+			return errs.Internal("更新角色权限策略失败", err)
+		}
 		if !isAdded {
 			return errors.New("更新角色成功，但角色关键字关联的权限接口更新失败")
 		}
-		isRemoved, _ := s.enforcer.RemovePolicies(rolePoliciesCopy)
+		isRemoved, err := s.enforcer.RemovePolicies(rolePoliciesCopy)
+		if err != nil {
+			return errs.Internal("更新角色权限策略失败", err)
+		}
 		if !isRemoved {
 			return errors.New("更新角色成功，但角色关键字关联的权限接口更新失败")
 		}
-		err := s.enforcer.LoadPolicy()
-		if err != nil {
+		if err := s.enforcer.LoadPolicy(); err != nil {
 			return errors.New("更新角色成功，但角色关键字关联角色的权限接口策略加载失败")
 		}
 	}
@@ -337,7 +342,10 @@ func (s *service) Delete(ctx context.Context, actor model.Admin, roleIds []int64
 	for _, role := range roles {
 		rmPolicies, _ := s.enforcer.GetFilteredPolicy(0, role.Keyword)
 		if len(rmPolicies) > 0 {
-			isRemoved, _ := s.enforcer.RemovePolicies(rmPolicies)
+			isRemoved, err := s.enforcer.RemovePolicies(rmPolicies)
+			if err != nil {
+				return errs.InternalWithKey(errs.MsgDeleteRoleApisFailed, nil, err)
+			}
 			if !isRemoved {
 				return errs.InternalWithKey(errs.MsgDeleteRoleApisFailed, nil, nil)
 			}

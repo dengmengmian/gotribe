@@ -5,6 +5,7 @@ package bootstrap
 import (
 	categoryhandler "gotribe/internal/api/category/handler"
 	categoryrepo "gotribe/internal/api/category/repository"
+	categoryservice "gotribe/internal/api/category/service"
 	confighandler "gotribe/internal/api/config/handler"
 	configrepo "gotribe/internal/api/config/repository"
 	configservice "gotribe/internal/api/config/service"
@@ -21,6 +22,7 @@ import (
 	profileservice "gotribe/internal/api/profile/service"
 	taghandler "gotribe/internal/api/tag/handler"
 	tagrepo "gotribe/internal/api/tag/repository"
+	tagservice "gotribe/internal/api/tag/service"
 	usereventhandler "gotribe/internal/api/user_event/handler"
 	usereventrepo "gotribe/internal/api/user_event/repository"
 	usereventservice "gotribe/internal/api/user_event/service"
@@ -159,15 +161,17 @@ func buildExampleModule(infra *Infra, posts exampleservice.PostSummaryReader) Ex
 
 func buildTagModule(infra *Infra) TagModule {
 	repo := tagrepo.NewRepository(infra.Tx)
+	service := tagservice.NewService(repo)
 	return TagModule{
-		Handler: taghandler.NewHandler(repo),
+		Handler: taghandler.NewHandler(service),
 	}
 }
 
 func buildCategoryModule(infra *Infra) CategoryModule {
 	repo := categoryrepo.NewRepository(infra.Tx)
+	service := categoryservice.NewService(repo)
 	return CategoryModule{
-		Handler: categoryhandler.NewHandler(repo),
+		Handler: categoryhandler.NewHandler(service),
 	}
 }
 

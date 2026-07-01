@@ -443,13 +443,21 @@ func validate(cfg Config) error {
 	if len(secret) < 32 {
 		return fmt.Errorf("auth.secret must be at least 32 characters")
 	}
-	weakSecrets := map[string]struct{}{
-		"change-me-in-production":                  {},
-		"local-dev-secret":                         {},
-		"replace-with-your-own-long-random-secret": {},
+	// 用子串匹配而非精确匹配，避免占位值改几个字符（如 .env.example 里带
+	// -min-32-chars 后缀）就绕过校验、用公开已知密钥签发 JWT。
+	weakMarkers := []string{
+		"change-me",
+		"local-dev-secret",
+		"replace-with-your-own",
+		"your-secret-here",
+		"placeholder",
+		"example-secret",
 	}
-	if _, found := weakSecrets[secret]; found {
-		return fmt.Errorf("auth.secret uses a placeholder value")
+	lowerSecret := strings.ToLower(secret)
+	for _, marker := range weakMarkers {
+		if strings.Contains(lowerSecret, marker) {
+			return fmt.Errorf("auth.secret uses a placeholder/weak value")
+		}
 	}
 	if cfg.Database.Host == "" {
 		return fmt.Errorf("database.host is required")

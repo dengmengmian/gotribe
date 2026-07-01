@@ -22,8 +22,14 @@ type Repository struct {
 	tx *database.TransactionManager
 }
 
-// 当前用户信息缓存，避免频繁获取数据库
-var adminInfoCache = cache.New(24*time.Hour, 48*time.Hour)
+// 当前用户信息缓存，避免频繁获取数据库。
+// TTL 取较短值：管理员被禁用 / 角色变更等安全敏感变更最长在此时间内生效
+// （多数变更路径会显式失效缓存，此 TTL 是兜底上界）。
+var adminInfoCache = cache.New(5*time.Minute, 10*time.Minute)
+
+// dummyAdminHash 用于时序攻击防护：无论管理员是否存在都执行一次 bcrypt 比较，
+// 使响应耗时一致，避免用户名枚举。值为一个合法但无意义的 bcrypt 哈希。
+const dummyAdminHash = "$2a$10$abcdefghijklmnopqrstuuxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 // NewRepository 创建管理员仓库实例
 func NewRepository(tx *database.TransactionManager) *Repository {
@@ -56,23 +62,29 @@ func buildAdminOrder(req *dto.AdminListRequest) string {
 
 // Login 登录
 func (r *Repository) Login(ctx context.Context, admin *model.Admin) (*model.Admin, error) {
-	// 根据用户名获取用户(正常状态:用户状态正常)
+	// 根据用户名获取用户
 	var firstAdmin model.Admin
 	err := r.tx.DB(ctx).
 		Where("username = ?", admin.Username).
 		Preload("Roles").
 		First(&firstAdmin).Error
 	if err != nil {
-		return nil, errs.Unauthorized(errs.T("zh", errs.MsgUserNotFound))
+		// 用户不存在也执行一次 bcrypt 比较，消除时序差异，避免用户名枚举；
+		// 且返回与「密码错误」相同的通用消息，不泄露账户是否存在。
+		_ = utils.PasswordUtil.ComparePasswd(dummyAdminHash, admin.Password)
+		return nil, errs.Unauthorized(errs.T("zh", errs.MsgInvalidCredentials))
 	}
 
-	// 判断用户的状态
-	adminStatus := firstAdmin.Status
-	if adminStatus != 1 {
+	// 先校验密码：在攻击者证明知道密码之前，不泄露账户是否被禁用/角色状态（防枚举）。
+	if err := utils.PasswordUtil.ComparePasswd(firstAdmin.Password, admin.Password); err != nil {
+		return nil, errs.Unauthorized(errs.T("zh", errs.MsgInvalidCredentials))
+	}
+
+	// 密码正确后再检查账户与角色状态。
+	if firstAdmin.Status != 1 {
 		return nil, errs.Forbidden(errs.T("zh", errs.MsgUserDisabled))
 	}
 
-	// 判断用户拥有的所有角色的状态,全部角色都被禁用则不能登录
 	roles := firstAdmin.Roles
 	isValidate := false
 	for _, role := range roles {
@@ -82,15 +94,10 @@ func (r *Repository) Login(ctx context.Context, admin *model.Admin) (*model.Admi
 			break
 		}
 	}
-
 	if !isValidate {
 		return nil, errs.Forbidden(errs.T("zh", errs.MsgUserRoleDisabled))
 	}
 
-	// 校验密码
-	if err := utils.PasswordUtil.ComparePasswd(firstAdmin.Password, admin.Password); err != nil {
-		return nil, errs.Unauthorized(errs.T("zh", errs.MsgPasswordIncorrect))
-	}
 	return &firstAdmin, nil
 }
 

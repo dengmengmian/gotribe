@@ -149,12 +149,18 @@ func (r *Repository) UpdateRoleApis(ctx context.Context, roleKeyword string, req
 	}
 	rmPolicies, _ := r.enforcer.GetFilteredPolicy(0, roleKeyword)
 	if len(rmPolicies) > 0 {
-		isRemoved, _ := r.enforcer.RemovePolicies(rmPolicies)
+		isRemoved, err := r.enforcer.RemovePolicies(rmPolicies)
+		if err != nil {
+			return errs.InternalWithKey(errs.MsgUpdateRoleApisFailed, nil, err)
+		}
 		if !isRemoved {
 			return errs.InternalWithKey(errs.MsgUpdateRoleApisFailed, nil, nil)
 		}
 	}
-	isAdded, _ := r.enforcer.AddPolicies(reqRolePolicies)
+	isAdded, err := r.enforcer.AddPolicies(reqRolePolicies)
+	if err != nil {
+		return errs.InternalWithKey(errs.MsgUpdateRoleApisFailed, nil, err)
+	}
 	if !isAdded {
 		return errs.InternalWithKey(errs.MsgUpdateRoleApisFailed, nil, nil)
 	}

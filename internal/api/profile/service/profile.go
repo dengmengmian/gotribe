@@ -10,15 +10,17 @@ import (
 	"strings"
 	"time"
 
+	profiledto "gotribe/internal/api/profile/dto"
+	profilerepo "gotribe/internal/api/profile/repository"
+	profileview "gotribe/internal/api/profile/view"
 	"gotribe/internal/auth/core"
 	"gotribe/internal/core/cache"
 	"gotribe/internal/core/database"
 	"gotribe/internal/core/errs"
 	applog "gotribe/internal/core/logger"
-	profiledto "gotribe/internal/api/profile/dto"
 	profilemodel "gotribe/internal/model"
-	profilerepo "gotribe/internal/api/profile/repository"
-	profileview "gotribe/internal/api/profile/view"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // sessionInvalidator 抽象按 audience 失效用户会话的能力。
@@ -35,6 +37,8 @@ type Service struct {
 	tokens         sessionInvalidator
 	tx             *database.TransactionManager
 	cacheTTL       int
+	// sf 合并同一用户资料的并发回源，防止缓存过期瞬间并发打 DB（缓存击穿）。
+	sf singleflight.Group
 }
 
 // NewService 创建当前用户资料服务实例。cacheTTL 由 config.Load 校验保证为正值。
@@ -62,18 +66,40 @@ func NewService(
 // GetMe 获取当前登录用户的资料信息。
 func (s *Service) GetMe(ctx context.Context, projectID string, userID int64) (*profileview.MeView, error) {
 	cacheKey := s.cache.ProfileKey(projectID, userID)
-	var cached profileview.MeView
-	if ok, err := s.cache.GetJSON(ctx, cacheKey, &cached); err == nil && ok {
-		return &cached, nil
+	if view, ok := s.readProfileCache(ctx, cacheKey); ok {
+		return view, nil
 	}
 
-	user, err := s.repo.GetByID(ctx, projectID, userID)
+	v, err, _ := s.sf.Do(cacheKey, func() (any, error) {
+		if view, ok := s.readProfileCache(ctx, cacheKey); ok {
+			return view, nil
+		}
+		user, err := s.repo.GetByID(ctx, projectID, userID)
+		if err != nil {
+			return nil, errs.NotFound("user not found", err)
+		}
+		view := toMeView(user)
+		_ = s.cache.SetJSON(ctx, cacheKey, view, cache.JitterTTL(time.Duration(s.cacheTTL)*time.Minute))
+		return &view, nil
+	})
 	if err != nil {
-		return nil, errs.NotFound("user not found", err)
+		return nil, err
 	}
-	view := toMeView(user)
-	_ = s.cache.SetJSON(ctx, cacheKey, view, time.Duration(s.cacheTTL)*time.Minute)
-	return &view, nil
+	return v.(*profileview.MeView), nil
+}
+
+// readProfileCache 读取资料缓存；读错误（非 miss）记日志但按未命中处理。
+func (s *Service) readProfileCache(ctx context.Context, cacheKey string) (*profileview.MeView, bool) {
+	var cached profileview.MeView
+	ok, err := s.cache.GetJSON(ctx, cacheKey, &cached)
+	if err != nil {
+		applog.Warn(ctx, "profile cache read failed", "err", err)
+		return nil, false
+	}
+	if !ok {
+		return nil, false
+	}
+	return &cached, true
 }
 
 // UpdateMe 更新当前登录用户允许修改的资料字段。

@@ -251,16 +251,18 @@ func (r *Repository) ListCacheRefsByIDs(ctx context.Context, ids []int64) ([]Pos
 	return refs, err
 }
 
-// Delete 批量删除
+// Delete 批量删除（幂等：不存在的 ID 直接跳过）。
 func (r *Repository) Delete(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	// 一次 IN 查询取出全部待删文章，避免逐个 Detail 造成 N+1（Detail 会额外查 tag/category/project）。
 	var posts []model.Post
-	for _, id := range ids {
-		// 根据ID获取标签
-		post, err := r.Detail(ctx, id)
-		if err != nil {
-			return fmt.Errorf("未获取到ID为%d的内容", id)
-		}
-		posts = append(posts, post)
+	if err := r.tx.DB(ctx).Where("id IN ?", ids).Find(&posts).Error; err != nil {
+		return err
+	}
+	if len(posts) == 0 {
+		return nil
 	}
 
 	db := r.tx.DB(ctx)
@@ -268,10 +270,8 @@ func (r *Repository) Delete(ctx context.Context, ids []int64) error {
 	for _, post := range posts {
 		postIDs = append(postIDs, post.ID)
 	}
-	if len(postIDs) > 0 {
-		if err := db.Where("post_id IN (?)", postIDs).Delete(&model.PostTag{}).Error; err != nil {
-			return err
-		}
+	if err := db.Where("post_id IN (?)", postIDs).Delete(&model.PostTag{}).Error; err != nil {
+		return err
 	}
 	return db.Delete(&posts).Error
 }

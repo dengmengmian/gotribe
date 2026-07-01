@@ -8,10 +8,10 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"gotribe/internal/core/database"
 	usereventdto "gotribe/internal/api/user_event/dto"
-	usereventmodel "gotribe/internal/model"
 	usereventrepo "gotribe/internal/api/user_event/repository"
+	"gotribe/internal/core/database"
+	usereventmodel "gotribe/internal/model"
 )
 
 func TestService_CreatePersistsEvent(t *testing.T) {
@@ -22,7 +22,7 @@ func TestService_CreatePersistsEvent(t *testing.T) {
 	tx := database.NewTransactionManager(db)
 	service := NewService(usereventrepo.NewRepository(tx))
 
-	err = service.Create(context.Background(), "proj-1", 1, usereventdto.CreateRequest{
+	err = service.Create(context.Background(), "1", 1, usereventdto.CreateRequest{
 		EventType:   1,
 		EventDetail: "opened page",
 		Duration:    10,

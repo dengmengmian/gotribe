@@ -2,37 +2,33 @@
 package handler
 
 import (
-	"net/http"
-
-	"gotribe/internal/core/response"
 	"gotribe/internal/api/tag/dto"
-	"gotribe/internal/api/tag/repository"
+	tagservice "gotribe/internal/api/tag/service"
+	"gotribe/internal/core/response"
+	"gotribe/internal/request"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Handler 标签 HTTP 处理器。
 type Handler struct {
-	repo *repository.Repository
+	service *tagservice.Service
 }
 
 // NewHandler 创建标签处理器。
-func NewHandler(repo *repository.Repository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(service *tagservice.Service) *Handler {
+	return &Handler{service: service}
 }
 
 // List 返回所有启用标签。
 func (h *Handler) List(c *gin.Context) {
 	var req dto.ListQuery
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := request.BindQuery(c, &req); err != nil {
+		response.Error(c, err)
 		return
 	}
-	if req.PerPage <= 0 {
-		req.PerPage = 100
-	}
 
-	tags, err := h.repo.List(c.Request.Context(), req.Keyword, req.PerPage)
+	tags, err := h.service.List(c.Request.Context(), req.Keyword, req.PerPage)
 	if err != nil {
 		response.Error(c, err)
 		return

@@ -5,10 +5,20 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+// JitterTTL 在基准 TTL 上叠加 0~10% 的随机抖动，避免大量缓存 key 在同一时刻过期
+// 造成缓存雪崩（同时回源打 DB）。base<=0 时原样返回。
+func JitterTTL(base time.Duration) time.Duration {
+	if base <= 0 {
+		return base
+	}
+	return base + time.Duration(rand.Int63n(int64(base)/10+1))
+}
 
 // Store 封装 Redis 常用读写能力和统一键构建入口。
 type Store struct {
@@ -73,6 +83,8 @@ func (s *Store) GetJSON(ctx context.Context, key string, dst any) (bool, error) 
 		return false, err
 	}
 	if err := json.Unmarshal(body, dst); err != nil {
+		// 缓存值已损坏：best-effort 删除，避免此后每次请求都重复解析失败。
+		_ = s.client.Del(ctx, key).Err()
 		return false, err
 	}
 	return true, nil

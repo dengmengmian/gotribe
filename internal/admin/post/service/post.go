@@ -275,6 +275,13 @@ func (s *postService) Publish(ctx context.Context, id int64) error {
 	if !utils.IsEmpty(projectInfo.PushToken) {
 		postURLWithID := projectInfo.PostURL + oldPost.Slug
 		go func() {
+			// 独立 goroutine 不在请求 recovery 中间件覆盖范围内，必须自带 recover，
+			// 否则百度推送里的 panic 会直接打崩整个进程。
+			defer func() {
+				if r := recover(); r != nil {
+					s.log.Errorf("推送百度 panic 已恢复: %v", r)
+				}
+			}()
 			if _, err := utils.SEOUtil.PushBaidu(projectInfo.Domain, projectInfo.PushToken, postURLWithID); err != nil {
 				s.log.Errorf("推送百度失败: %v", err)
 			}
