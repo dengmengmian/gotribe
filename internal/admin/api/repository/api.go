@@ -16,10 +16,10 @@ import (
 
 type Repository struct {
 	tx       *database.TransactionManager
-	enforcer *casbin.Enforcer
+	enforcer *casbin.SyncedEnforcer
 }
 
-func NewRepository(tx *database.TransactionManager, enforcer *casbin.Enforcer) *Repository {
+func NewRepository(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer) *Repository {
 	return &Repository{tx: tx, enforcer: enforcer}
 }
 

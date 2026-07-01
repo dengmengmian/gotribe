@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
@@ -14,11 +13,8 @@ import (
 	"gotribe/internal/core/response"
 )
 
-// 使用读写锁提升并发性能，权限检查是读操作，可以并发执行
-var checkLock sync.RWMutex
-
 // Casbin中间件, 基于RBAC的权限访问控制模型
-func CasbinMiddleware(tx *database.TransactionManager, enforcer *casbin.Enforcer, urlPathPrefix string) gin.HandlerFunc {
+func CasbinMiddleware(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer, urlPathPrefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ur := adminrepo.NewRepository(tx)
 		actor, err := common.CurrentAdmin(c)
@@ -76,11 +72,8 @@ func CasbinMiddleware(tx *database.TransactionManager, enforcer *casbin.Enforcer
 	}
 }
 
-func check(enforcer *casbin.Enforcer, subs []string, obj string, act string) bool {
-	// 使用读锁允许并发权限检查，提升性能
-	checkLock.RLock()
-	defer checkLock.RUnlock()
-
+func check(enforcer *casbin.SyncedEnforcer, subs []string, obj string, act string) bool {
+	// SyncedEnforcer.Enforce 自身持内部读锁，天然支持并发鉴权，无需外部加锁。
 	if enforcer == nil {
 		return false
 	}

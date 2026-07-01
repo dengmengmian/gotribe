@@ -29,6 +29,25 @@ func (r *Repository) Detail(ctx context.Context, id int64) (model.User, error) {
 	return user, err
 }
 
+// UserProfileRef 承载失效 ToC 用户资料缓存所需的最小字段。
+type UserProfileRef struct {
+	ID        int64
+	ProjectID int64
+}
+
+// ListProfileRefsByIDs 按用户 ID 列表查询失效 ToC profile 缓存所需的 id / project_id。
+func (r *Repository) ListProfileRefsByIDs(ctx context.Context, ids []int64) ([]UserProfileRef, error) {
+	refs := make([]UserProfileRef, 0, len(ids))
+	if len(ids) == 0 {
+		return refs, nil
+	}
+	err := r.tx.DB(ctx).Model(&model.User{}).
+		Select("id", "project_id").
+		Where("id IN ?", ids).
+		Find(&refs).Error
+	return refs, err
+}
+
 // List 获取用户列表
 func (r *Repository) List(ctx context.Context, req *dto.UserListRequest) ([]*model.User, int64, error) {
 	var list []*model.User

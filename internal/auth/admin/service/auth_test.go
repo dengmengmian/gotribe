@@ -66,7 +66,7 @@ func TestNewService(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	tx := database.NewTransactionManager(db)
-	svc := NewService(core.AudienceAdmin, tx, newTestManager(t), nil, nil, 5*time.Minute, false)
+	svc := NewService(core.AudienceAdmin, tx, newTestManager(t), nil, nil, nil, 5*time.Minute, false)
 	require.NotNil(t, svc)
 }
 
@@ -75,7 +75,7 @@ func TestAuthService_Login(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute, false)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, nil, 5*time.Minute, false)
 	ctx := context.Background()
 
 	t.Run("登录成功", func(t *testing.T) {
@@ -116,11 +116,11 @@ func TestAuthService_Refresh(t *testing.T) {
 	admin := createTestAdmin(t, db)
 
 	manager := newTestManager(t)
-	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, 5*time.Minute, false)
+	svc := NewService(core.AudienceAdmin, tx, manager, nil, nil, nil, 5*time.Minute, false)
 	ctx := context.Background()
 
 	t.Run("刷新成功", func(t *testing.T) {
-		result, err := svc.Refresh(ctx, admin.ID, admin.Username)
+		result, err := svc.Refresh(ctx, admin.ID, admin.Username, time.Now())
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.NotEmpty(t, result.Token)
@@ -133,12 +133,12 @@ func TestAuthService_Refresh(t *testing.T) {
 	})
 
 	t.Run("刷新生成不同 token", func(t *testing.T) {
-		result1, err := svc.Refresh(ctx, admin.ID, admin.Username)
+		result1, err := svc.Refresh(ctx, admin.ID, admin.Username, time.Now())
 		require.NoError(t, err)
 
 		time.Sleep(2 * time.Second) // 确保 iat 不同
 
-		result2, err := svc.Refresh(ctx, admin.ID, admin.Username)
+		result2, err := svc.Refresh(ctx, admin.ID, admin.Username, time.Now())
 		require.NoError(t, err)
 
 		require.NotEqual(t, result1.Token, result2.Token)

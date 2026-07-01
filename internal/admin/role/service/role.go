@@ -36,12 +36,12 @@ type service struct {
 	adminRepo *adminrepo.Repository
 	menuRepo  *menurepo.Repository
 	apiRepo   *apirepo.Repository
-	enforcer  *casbin.Enforcer
+	enforcer  *casbin.SyncedEnforcer
 	tx        *database.TransactionManager
 }
 
 // NewRoleService 创建角色服务实例
-func NewService(tx *database.TransactionManager, enforcer *casbin.Enforcer) Service {
+func NewService(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer) Service {
 	return &service{
 		roleRepo:  repository.NewRepository(tx, enforcer),
 		adminRepo: adminrepo.NewRepository(tx),

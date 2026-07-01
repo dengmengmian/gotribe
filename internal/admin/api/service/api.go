@@ -23,11 +23,11 @@ type Service interface {
 // service 接口业务逻辑实现
 type service struct {
 	apiRepo  *repository.Repository
-	enforcer *casbin.Enforcer
+	enforcer *casbin.SyncedEnforcer
 }
 
 // NewApiService 创建接口服务实例
-func NewService(tx *database.TransactionManager, enforcer *casbin.Enforcer) Service {
+func NewService(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer) Service {
 	return &service{
 		apiRepo:  repository.NewRepository(tx, enforcer),
 		enforcer: enforcer,

@@ -36,8 +36,9 @@ type AdminInfra struct {
 	Redis       *redis.Client
 	Tx          *database.TransactionManager
 	Log         *zap.SugaredLogger
-	Enforcer    *casbin.Enforcer
+	Enforcer    *casbin.SyncedEnforcer
 	AuthManager *core.Manager
+	AuthTokens  *core.TokenStore
 	UploadCfg   resourceservice.UploadConfig
 	CDNDomain   string
 }
@@ -113,6 +114,17 @@ func NewAdminProviders(cfg coreconfig.Config) (*AdminProviders, error) {
 
 	uploadCfg, cdnDomain := resolveUploadConfig(cfg)
 
+	keys := cache.NewKeyBuilder(cfg.App.Name)
+
+	// TokenStore 用于 Admin 会话失效（登出吊销、刷新校验）。依赖 Redis：
+	// Redis 不可用时保持 nil，吊销功能降级为不可用并告警（不静默）。
+	var tokenStore *core.TokenStore
+	if redisClient != nil {
+		tokenStore = core.NewTokenStore(redisClient, keys)
+	} else {
+		applog.Warn("Redis 不可用：Admin 登出吊销 / 会话失效功能已禁用")
+	}
+
 	infra := &AdminInfra{
 		Cfg:         cfg,
 		DB:          db,
@@ -121,12 +133,12 @@ func NewAdminProviders(cfg coreconfig.Config) (*AdminProviders, error) {
 		Log:         applog,
 		Enforcer:    enforcer,
 		AuthManager: authManager,
+		AuthTokens:  tokenStore,
 		UploadCfg:   uploadCfg,
 		CDNDomain:   cdnDomain,
 	}
 
-	keys := cache.NewKeyBuilder(cfg.App.Name)
-	modules := routes.BuildAdminModules(tx, enforcer, applog, authManager, cdnDomain, uploadCfg, redisClient, cfg.AI, cfg.Admin, keys)
+	modules := routes.BuildAdminModules(tx, enforcer, applog, authManager, tokenStore, cdnDomain, uploadCfg, redisClient, cfg.AI, cfg.Admin, keys)
 
 	p := &AdminProviders{
 		Infra:   infra,

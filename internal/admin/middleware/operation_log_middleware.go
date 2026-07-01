@@ -28,7 +28,7 @@ var skipPaths = []string{
 	"/swagger/",
 }
 
-func OperationLogMiddleware(db *gorm.DB, enforcer *casbin.Enforcer, urlPathPrefix string, log *zap.SugaredLogger) gin.HandlerFunc {
+func OperationLogMiddleware(db *gorm.DB, enforcer *casbin.SyncedEnforcer, urlPathPrefix string, log *zap.SugaredLogger) gin.HandlerFunc {
 	tx := database.NewTransactionManager(db)
 	return func(c *gin.Context) {
 		// 获取实际请求路径
@@ -112,7 +112,7 @@ func getUsername(c *gin.Context) string {
 }
 
 // 获取API描述
-func getApiDescription(path, method string, c *gin.Context, tx *database.TransactionManager, enforcer *casbin.Enforcer, log *zap.SugaredLogger) string {
+func getApiDescription(path, method string, c *gin.Context, tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer, log *zap.SugaredLogger) string {
 	cacheKey := method + ":" + path
 	if cachedDesc, ok := apiDescCache.Get(cacheKey); ok {
 		return cachedDesc.(string)

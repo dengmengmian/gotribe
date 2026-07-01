@@ -11,8 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// 初始化casbin策略管理器
-func InitCasbinEnforcer(modelPath string, db *gorm.DB, log *zap.SugaredLogger) *casbin.Enforcer {
+// 初始化casbin策略管理器。
+// 返回 *casbin.SyncedEnforcer：其 Enforce / AddPolicies / RemovePolicies / LoadPolicy
+// 等操作自身持内部读写锁，保证「并发鉴权」与「运行时改策略」不产生 concurrent map read/write。
+func InitCasbinEnforcer(modelPath string, db *gorm.DB, log *zap.SugaredLogger) *casbin.SyncedEnforcer {
 	e, err := databaseCasbin(modelPath, db, log)
 	if err != nil {
 		log.Panicf("初始化Casbin失败：%v", err)
@@ -23,7 +25,7 @@ func InitCasbinEnforcer(modelPath string, db *gorm.DB, log *zap.SugaredLogger) *
 	return e
 }
 
-func databaseCasbin(modelPath string, db *gorm.DB, log *zap.SugaredLogger) (*casbin.Enforcer, error) {
+func databaseCasbin(modelPath string, db *gorm.DB, log *zap.SugaredLogger) (*casbin.SyncedEnforcer, error) {
 	a, err := gormadapter.NewAdapterByDB(db)
 	if err != nil {
 		return nil, err
@@ -40,12 +42,12 @@ func databaseCasbin(modelPath string, db *gorm.DB, log *zap.SugaredLogger) (*cas
 		modelPath = envModelPath
 	}
 
-	var e *casbin.Enforcer
+	var e *casbin.SyncedEnforcer
 	// 如果外部文件存在则优先使用
 	if modelPath != "" {
 		if _, statErr := os.Stat(modelPath); statErr == nil {
 			log.Infof("加载外部 RBAC 模型: %s", modelPath)
-			e, err = casbin.NewEnforcer(modelPath, a)
+			e, err = casbin.NewSyncedEnforcer(modelPath, a)
 			if err != nil {
 				log.Warnf("加载外部 RBAC 模型失败(%s): %v，使用内置默认", modelPath, err)
 				e = nil
@@ -65,7 +67,7 @@ func databaseCasbin(modelPath string, db *gorm.DB, log *zap.SugaredLogger) (*cas
 			return nil, fmt.Errorf("加载内置 RBAC 模型失败: %w", err)
 		}
 		log.Info("加载内置默认 RBAC 模型")
-		e, err = casbin.NewEnforcer(m, a)
+		e, err = casbin.NewSyncedEnforcer(m, a)
 		if err != nil {
 			return nil, err
 		}

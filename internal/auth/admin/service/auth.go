@@ -18,7 +18,8 @@ import (
 // Service 认证业务逻辑接口
 type Service interface {
 	Login(ctx context.Context, username, password, clientIP string) (*LoginResult, error)
-	Refresh(ctx context.Context, userID int64, username string) (*LoginResult, error)
+	Refresh(ctx context.Context, userID int64, username string, issuedAt time.Time) (*LoginResult, error)
+	Logout(ctx context.Context, userID int64) error
 }
 
 // LoginStage 表示登录流程当前所处阶段。
@@ -52,6 +53,7 @@ type service struct {
 	audience     string
 	adminRepo    *adminrepo.Repository
 	manager      *core.Manager
+	tokenStore   *core.TokenStore
 	lockout      *LockoutTracker
 	totpService  TOTPService
 	stepTokenTTL time.Duration
@@ -59,12 +61,14 @@ type service struct {
 }
 
 // NewService 创建认证服务实例。audience 通常传 core.AudienceAdmin。
+// tokenStore 用于登出吊销与刷新校验；可为 nil（Redis 不可用时降级为不吊销）。
 // lockout 与 totpService 可为 nil（用于过渡期或单测），但建议生产环境注入。
 // totpRequired=true 时，未绑 TOTP 的 admin 登录将返回 stage=bind_required 强制绑定。
 func NewService(
 	audience string,
 	tx *database.TransactionManager,
 	manager *core.Manager,
+	tokenStore *core.TokenStore,
 	lockout *LockoutTracker,
 	totpService TOTPService,
 	stepTokenTTL time.Duration,
@@ -74,6 +78,7 @@ func NewService(
 		audience:     audience,
 		adminRepo:    adminrepo.NewRepository(tx),
 		manager:      manager,
+		tokenStore:   tokenStore,
 		lockout:      lockout,
 		totpService:  totpService,
 		stepTokenTTL: stepTokenTTL,
@@ -159,8 +164,21 @@ func (s *service) Login(ctx context.Context, username, password, clientIP string
 	}, nil
 }
 
-// Refresh 为已登录用户重新签发 JWT
-func (s *service) Refresh(ctx context.Context, userID int64, username string) (*LoginResult, error) {
+// Refresh 为已登录用户重新签发 JWT。
+// issuedAt 为原 access token 的签发时间：若该会话已被登出吊销（invalid_before 之前签发），
+// 则拒绝刷新，避免已登出 / 泄露的 token 被无限续期。
+// Admin 身份无 project 维度，会话键以空 projectID 归一（与鉴权中间件一致）。
+func (s *service) Refresh(ctx context.Context, userID int64, username string, issuedAt time.Time) (*LoginResult, error) {
+	if s.tokenStore != nil {
+		valid, err := s.tokenStore.IsAccessTokenValid(ctx, s.audience, "", userID, issuedAt)
+		if err != nil {
+			return nil, errs.ServiceUnavailable("会话状态校验暂不可用，请稍后重试", err)
+		}
+		if !valid {
+			return nil, errs.Unauthorized("登录状态已失效，请重新登录")
+		}
+	}
+
 	subject := core.Subject{
 		UserID:   userID,
 		Username: username,
@@ -175,4 +193,19 @@ func (s *service) Refresh(ctx context.Context, userID int64, username string) (*
 		Token:   token,
 		Expires: expires,
 	}, nil
+}
+
+// Logout 吊销该管理员当前 audience 下的所有会话：
+// 设置 access token 失效时间为当前时刻，使此前签发的 access token 立即失效
+// （由 JWTMiddleware 的 checker 与 Refresh 共同拒绝）。
+// tokenStore 为 nil（Redis 不可用）时为无害的空操作。
+func (s *service) Logout(ctx context.Context, userID int64) error {
+	if s.tokenStore == nil {
+		return nil
+	}
+	accessTTL, ok := s.manager.AccessTTL(s.audience)
+	if !ok {
+		return errs.Internal("未知的 audience，无法登出", nil)
+	}
+	return s.tokenStore.InvalidateUserSessions(ctx, s.audience, "", userID, time.Now().UTC(), accessTTL)
 }

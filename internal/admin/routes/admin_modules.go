@@ -96,9 +96,10 @@ func newPostCacheStore(redisClient redis.UniversalClient, keys *cache.KeyBuilder
 // BuildAdminModules 装配全部 Admin 业务模块。
 func BuildAdminModules(
 	tx *database.TransactionManager,
-	enforcer *casbin.Enforcer,
+	enforcer *casbin.SyncedEnforcer,
 	log *zap.SugaredLogger,
 	authManager *core.Manager,
+	tokenStore *core.TokenStore,
 	cdnDomain string,
 	uploadCfg resourceservice.UploadConfig,
 	redisClient redis.UniversalClient,
@@ -111,7 +112,7 @@ func BuildAdminModules(
 	if err != nil {
 		log.Fatalf("TOTP 服务初始化失败: %v", err)
 	}
-	authSvc := authservice.NewService(core.AudienceAdmin, tx, authManager, lockout, totpSvc, adminCfg.TOTP.StepTokenTTL(), adminCfg.TOTP.Required)
+	authSvc := authservice.NewService(core.AudienceAdmin, tx, authManager, tokenStore, lockout, totpSvc, adminCfg.TOTP.StepTokenTTL(), adminCfg.TOTP.Required)
 	return &AdminModules{
 		Auth:         authhandler.NewHandler(core.AudienceAdmin, authSvc, authManager, totpSvc),
 		AI:           aihandler.NewHandler(aiservice.NewService(aiCfg)),
@@ -125,7 +126,7 @@ func BuildAdminModules(
 		Tag:          taghandler.NewHandler(tagservice.NewService(tx)),
 		Category:     categoryhandler.NewHandler(categoryservice.NewService(tx, log)),
 		Post:         posthandler.NewHandler(postservice.NewService(tx, log, newPostCacheStore(redisClient, keys))),
-		User:         userhandler.NewHandler(userservice.NewService(tx), cdnDomain),
+		User:         userhandler.NewHandler(userservice.NewService(tx, newPostCacheStore(redisClient, keys), log), cdnDomain),
 		Resource:     resourcehandler.NewHandler(resourceservice.NewService(tx, uploadCfg, log), cdnDomain),
 		Column:       columnhandler.NewHandler(columnservice.NewService(tx)),
 		AdScene:      adscenehandler.NewHandler(adsceneservice.NewService(tx)),

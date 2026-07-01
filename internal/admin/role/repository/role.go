@@ -16,11 +16,11 @@ import (
 // Repository 角色数据访问实现
 type Repository struct {
 	tx       *database.TransactionManager
-	enforcer *casbin.Enforcer
+	enforcer *casbin.SyncedEnforcer
 }
 
 // NewRepository 创建角色仓库实例
-func NewRepository(tx *database.TransactionManager, enforcer *casbin.Enforcer) *Repository {
+func NewRepository(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer) *Repository {
 	return &Repository{tx: tx, enforcer: enforcer}
 }
 

@@ -70,6 +70,35 @@ func (s *postService) clearPostListCacheByProject(ctx context.Context, projectID
 	}
 }
 
+// clearPostDetailCache 失效 ToC 文章详情缓存（best effort）。
+// ToC 详情既可用 post_id 命中也可用 slug 命中，因此对同一篇文章需删除多个 key。
+// identifiers 传入 post_id 及涉及的新旧 slug，空值会被忽略。
+func (s *postService) clearPostDetailCache(ctx context.Context, projectID int64, identifiers ...string) {
+	if s.cache == nil || projectID <= 0 {
+		return
+	}
+	pid := fmt.Sprintf("%d", projectID)
+	keys := make([]string, 0, len(identifiers))
+	seen := make(map[string]struct{}, len(identifiers))
+	for _, id := range identifiers {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		keys = append(keys, s.cache.PostDetailKey(pid, id))
+	}
+	if len(keys) == 0 {
+		return
+	}
+	if err := s.cache.Delete(ctx, keys...); err != nil {
+		s.log.Warnf("清除项目 %d 文章详情缓存失败: %v", projectID, err)
+	}
+}
+
 // Create 创建内容
 func (s *postService) Create(ctx context.Context, req *dto.CreatePostRequest) error {
 	slug := req.Slug
@@ -134,6 +163,9 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 	if err != nil {
 		return err
 	}
+	// 记录更新前的项目与 slug，便于失效可能因迁移项目 / 改 slug 而残留的旧缓存。
+	originalProjectID := oldPost.ProjectID
+	originalSlug := oldPost.Slug
 	imageStr := strings.Join(req.Images, ",")
 	postTime, err := parseOptionalPostTime(req.Time, constant.TIME_FORMAT_SHORT)
 	if err != nil {
@@ -182,7 +214,14 @@ func (s *postService) Update(ctx context.Context, id int64, req *dto.UpdatePostR
 		return nil
 	})
 	if err == nil {
-		s.clearPostListCacheByProject(ctx, oldPost.ProjectID)
+		// 原项目：列表 + 详情（含新旧 slug 与 post_id）都失效。
+		s.clearPostListCacheByProject(ctx, originalProjectID)
+		s.clearPostDetailCache(ctx, originalProjectID, oldPost.PostID, originalSlug, oldPost.Slug)
+		// 若文章被迁移到新项目，新项目缓存也要失效。
+		if oldPost.ProjectID != originalProjectID {
+			s.clearPostListCacheByProject(ctx, oldPost.ProjectID)
+			s.clearPostDetailCache(ctx, oldPost.ProjectID, oldPost.PostID, oldPost.Slug)
+		}
 	}
 	return err
 }
@@ -192,16 +231,22 @@ func (s *postService) Delete(ctx context.Context, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	projectIDs, err := s.postRepo.ListProjectIDsByIDs(ctx, ids)
+	// 删除前取出失效缓存所需字段；查询失败则不继续删除，避免留下无法清理的脏缓存。
+	refs, err := s.postRepo.ListCacheRefsByIDs(ctx, ids)
 	if err != nil {
-		s.log.Warnf("查询待删除文章的项目ID失败: %v", err)
+		return errs.Internal("查询待删除文章缓存信息失败", err)
 	}
 	err = s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		return s.postRepo.Delete(txCtx, ids)
 	})
 	if err == nil {
-		for _, pid := range projectIDs {
-			s.clearPostListCacheByProject(ctx, pid)
+		clearedList := make(map[int64]struct{}, len(refs))
+		for _, ref := range refs {
+			if _, ok := clearedList[ref.ProjectID]; !ok {
+				clearedList[ref.ProjectID] = struct{}{}
+				s.clearPostListCacheByProject(ctx, ref.ProjectID)
+			}
+			s.clearPostDetailCache(ctx, ref.ProjectID, ref.PostID, ref.Slug)
 		}
 	}
 	return err
@@ -221,6 +266,7 @@ func (s *postService) Publish(ctx context.Context, id int64) error {
 		return err
 	}
 	s.clearPostListCacheByProject(ctx, oldPost.ProjectID)
+	s.clearPostDetailCache(ctx, oldPost.ProjectID, oldPost.PostID, oldPost.Slug)
 	projectInfo, err := s.projectRepo.GetProjectByID(ctx, oldPost.ProjectID)
 	if err != nil {
 		s.log.Errorf("获取项目信息失败: %v", err)

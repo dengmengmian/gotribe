@@ -33,8 +33,10 @@ type Infra struct {
 	DB          *gorm.DB
 	Tx          *database.TransactionManager
 	Log         *zap.SugaredLogger
-	Enforcer    *casbin.Enforcer
+	Enforcer    *casbin.SyncedEnforcer
 	AuthManager *core.Manager
+	// AuthTokens 提供 access token 失效检查（登出吊销）；Redis 不可用时为 nil。
+	AuthTokens *core.TokenStore
 }
 
 // nonSPAPathPrefixes 列出不应回退到 SPA index.html 的请求路径前缀。
@@ -55,7 +57,13 @@ func InitRoutes(infra *Infra, cfg coreconfig.Config, modules *AdminModules) *gin
 
 	adminRepo := adminrepo.NewRepository(infra.Tx)
 	setupMiddlewares(engine, infra, cfg)
-	jwtMW := core.JWTMiddleware(infra.AuthManager, core.AudienceAdmin, nil)
+	// 接入 access token 失效检查：登出 / 改密后此前签发的 token 立即 401。
+	// 用局部变量避免把 (*TokenStore)(nil) 装进接口造成 typed-nil 误判。
+	var accessChecker core.AccessTokenChecker
+	if infra.AuthTokens != nil {
+		accessChecker = infra.AuthTokens
+	}
+	jwtMW := core.JWTMiddleware(infra.AuthManager, core.AudienceAdmin, accessChecker)
 	adminLoader := middleware.AdminUserLoader(adminRepo, infra.Log)
 	// 旧 RegisterRoutes 接收一个 authMiddleware 形参，是历史 API。认证流程实际上由
 	// protected.Use(jwtMW, adminLoader) 应用，这里传入 noopAuth 占位即可。

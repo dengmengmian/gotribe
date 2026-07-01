@@ -92,6 +92,19 @@ func TestValidateConfig(t *testing.T) {
 			User:   AuthAudienceConfig{Audience: "gotribe.user", AccessTokenTTLMinutes: 120, RefreshTokenTTLHours: 168},
 			Admin:  AuthAudienceConfig{Audience: "gotribe.admin", AccessTokenTTLMinutes: 60, RefreshTokenTTLHours: 24},
 		},
+		// TOTP 加密密钥等字段为运行时强制项（NewTOTPService 始终构造 AES-256-GCM cipher），
+		// validate 会校验，因此有效配置必须提供。
+		Admin: AdminConfig{
+			TOTP: AdminTOTPConfig{
+				Issuer:              "gotribe",
+				SecretEncryptionKey: "0123456789abcdef0123456789abcdef",
+				RecoveryCodesCount:  10,
+				StepTokenTTLSeconds: 300,
+				Period:              30,
+				Digits:              6,
+				Skew:                1,
+			},
+		},
 	}
 
 	if err := validate(valid); err != nil {

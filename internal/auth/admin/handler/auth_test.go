@@ -23,7 +23,8 @@ import (
 // mockAuthService 模拟 auth.Service
 type mockAuthService struct {
 	loginFunc   func(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error)
-	refreshFunc func(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error)
+	refreshFunc func(ctx context.Context, userID int64, username string, issuedAt time.Time) (*authservice.LoginResult, error)
+	logoutFunc  func(ctx context.Context, userID int64) error
 }
 
 func (m *mockAuthService) Login(ctx context.Context, username, password, clientIP string) (*authservice.LoginResult, error) {
@@ -33,11 +34,18 @@ func (m *mockAuthService) Login(ctx context.Context, username, password, clientI
 	return nil, errors.New("login not implemented")
 }
 
-func (m *mockAuthService) Refresh(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error) {
+func (m *mockAuthService) Refresh(ctx context.Context, userID int64, username string, issuedAt time.Time) (*authservice.LoginResult, error) {
 	if m.refreshFunc != nil {
-		return m.refreshFunc(ctx, userID, username)
+		return m.refreshFunc(ctx, userID, username, issuedAt)
 	}
 	return nil, errors.New("refresh not implemented")
+}
+
+func (m *mockAuthService) Logout(ctx context.Context, userID int64) error {
+	if m.logoutFunc != nil {
+		return m.logoutFunc(ctx, userID)
+	}
+	return nil
 }
 
 func newTestManager(t *testing.T, ttl time.Duration) *core.Manager {
@@ -162,7 +170,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 		require.NoError(t, err)
 
 		h.authService = &mockAuthService{
-			refreshFunc: func(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error) {
+			refreshFunc: func(ctx context.Context, userID int64, username string, issuedAt time.Time) (*authservice.LoginResult, error) {
 				return &authservice.LoginResult{
 					Token:   "new-token",
 					Expires: time.Now().Add(time.Hour),
@@ -192,7 +200,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 
 		h.manager = expiredManager
 		h.authService = &mockAuthService{
-			refreshFunc: func(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error) {
+			refreshFunc: func(ctx context.Context, userID int64, username string, issuedAt time.Time) (*authservice.LoginResult, error) {
 				return &authservice.LoginResult{
 					Token:   "new-token",
 					Expires: time.Now().Add(time.Hour),
@@ -231,7 +239,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 		require.NoError(t, err)
 
 		h.authService = &mockAuthService{
-			refreshFunc: func(ctx context.Context, userID int64, username string) (*authservice.LoginResult, error) {
+			refreshFunc: func(ctx context.Context, userID int64, username string, issuedAt time.Time) (*authservice.LoginResult, error) {
 				return nil, errors.New("token generation failed")
 			},
 		}

@@ -78,6 +78,22 @@ func (h *Handler) Login(c *gin.Context) {
 // @Router       /base/logout [post]
 // @Security     BearerAuth
 func (h *Handler) Logout(c *gin.Context) {
+	// Logout 挂在未鉴权分组上，需自行从 Bearer 中解析身份。
+	// 允许过期 token 登出（幂等）；无有效 token 时视为已登出，直接返回 OK。
+	bearer, err := core.ParseBearerToken(c.GetHeader("Authorization"))
+	if err != nil {
+		response.OK(c, nil)
+		return
+	}
+	claims, err := h.manager.VerifyAccessTokenWithoutExpiry(h.audience, bearer)
+	if err != nil {
+		response.OK(c, nil)
+		return
+	}
+	if err := h.authService.Logout(c.Request.Context(), claims.UserID); err != nil {
+		response.Error(c, err)
+		return
+	}
 	response.OK(c, nil)
 }
 
@@ -102,10 +118,14 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		response.Error(c, errs.Unauthorized("缺少或无效的认证令牌"))
 		return
 	}
+	if claims.IssuedAt == nil {
+		response.Error(c, errs.Unauthorized("缺少或无效的认证令牌"))
+		return
+	}
 
-	result, err := h.authService.Refresh(c.Request.Context(), claims.UserID, claims.Username)
+	result, err := h.authService.Refresh(c.Request.Context(), claims.UserID, claims.Username, claims.IssuedAt.Time)
 	if err != nil {
-		response.Error(c, errs.Internal("刷新令牌失败，请稍后重试", err))
+		response.Error(c, err)
 		return
 	}
 

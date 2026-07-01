@@ -35,7 +35,7 @@ type service struct {
 }
 
 // NewAdminService 创建管理员服务实例
-func NewService(tx *database.TransactionManager, enforcer *casbin.Enforcer) Service {
+func NewService(tx *database.TransactionManager, enforcer *casbin.SyncedEnforcer) Service {
 	return &service{
 		adminRepo: repository.NewRepository(tx),
 		roleRepo:  rolerepo.NewRepository(tx, enforcer),

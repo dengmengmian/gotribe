@@ -230,11 +230,25 @@ func (r *Repository) Update(ctx context.Context, post *model.Post) error {
 	return syncPostTags(db, post.ID, post.Tag)
 }
 
-// ListProjectIDsByIDs 按文章 ID 列表查询涉及的项目 ID（去重）。
-func (r *Repository) ListProjectIDsByIDs(ctx context.Context, ids []int64) ([]int64, error) {
-	var projectIDs []int64
-	err := r.tx.DB(ctx).Model(&model.Post{}).Distinct("project_id").Where("id IN ?", ids).Pluck("project_id", &projectIDs).Error
-	return projectIDs, err
+// PostCacheRef 承载失效 ToC 缓存所需的最小字段。
+type PostCacheRef struct {
+	ProjectID int64
+	PostID    string
+	Slug      string
+}
+
+// ListCacheRefsByIDs 按文章 ID 列表查询失效 ToC 缓存所需的 project_id / post_id / slug。
+// ToC 详情缓存既可用 post_id 命中也可用 slug 命中，两者都要拿到。
+func (r *Repository) ListCacheRefsByIDs(ctx context.Context, ids []int64) ([]PostCacheRef, error) {
+	refs := make([]PostCacheRef, 0, len(ids))
+	if len(ids) == 0 {
+		return refs, nil
+	}
+	err := r.tx.DB(ctx).Model(&model.Post{}).
+		Select("project_id", "post_id", "slug").
+		Where("id IN ?", ids).
+		Find(&refs).Error
+	return refs, err
 }
 
 // Delete 批量删除

@@ -42,6 +42,7 @@ func NewAdminApp(cfg coreconfig.Config) (*AdminApp, error) {
 		Enforcer:    providers.Infra.Enforcer,
 		Tx:          providers.Infra.Tx,
 		AuthManager: providers.Infra.AuthManager,
+		AuthTokens:  providers.Infra.AuthTokens,
 	}, cfg, providers.Modules)
 
 	srv := &http.Server{
